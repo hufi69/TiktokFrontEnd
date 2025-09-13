@@ -46,8 +46,45 @@ const fetchPosts = createAsyncThunk(
         });
       }
       
-      // Transform posts
-      const transformedPosts = rawPosts.map(post => transformPost(post, user?._id));
+      // FIXED: Process posts to properly extract comment counts
+      const processedPosts = rawPosts.map(post => {
+        // Your backend stores comment count in post.comments field (number)
+        const commentCount = Number(post.comments) || 0;
+        
+        const processedPost = {
+          ...post,
+          id: post._id || post.id,
+          _id: post._id || post.id,
+          // FIXED: Use the actual comment count from backend
+          commentsCount: commentCount,
+          commentCount: commentCount,
+          comments: commentCount, // For backward compatibility
+          // Handle likes
+          likes: Number(post.likes) || 0,
+          likedByMe: Boolean(post.likedByMe),
+          isLiked: Boolean(post.likedByMe),
+          // Ensure author structure
+          author: {
+            _id: post.author?._id || post.author?.id,
+            userName: post.author?.userName || post.author?.username,
+            fullName: post.author?.fullName || post.author?.name,
+            profilePicture: post.author?.profilePicture || null,
+            ...post.author
+          }
+        };
+
+        console.log(`📋 Processed post ${processedPost.id}:`, {
+          commentCount: processedPost.commentsCount,
+          backendComments: post.comments,
+          likes: processedPost.likes,
+          likedByMe: processedPost.likedByMe
+        });
+
+        return processedPost;
+      });
+      
+      // Transform posts using the processed data
+      const transformedPosts = processedPosts.map(post => transformPost(post, user?._id));
       console.log('✅ Fetch posts successful, count:', transformedPosts.length);
       
       return transformedPosts;

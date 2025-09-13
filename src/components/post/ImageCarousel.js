@@ -14,19 +14,52 @@ const ImageCarousel = ({ images, style }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
 
+  // FIXED: Function to handle both string URLs and media objects
+  const getImageUri = (media) => {
+    // If it's already a string URL
+    if (typeof media === 'string') {
+      return media.startsWith('http') ? media : `http://10.0.2.2:8000${media}`;
+    }
+    
+    // If it's a media object from backend
+    if (media && typeof media === 'object' && media.url) {
+      const url = media.url;
+      return url.startsWith('http') ? url : `http://10.0.2.2:8000${url}`;
+    }
+    
+    // Fallback placeholder
+    return 'https://via.placeholder.com/300x300/f0f0f0/ccc?text=No+Image';
+  };
+
   const handleScroll = (event) => {
     const scrollPosition = event.nativeEvent.contentOffset.x;
     const index = Math.round(scrollPosition / screenWidth);
     setCurrentIndex(index);
   };
 
-  const renderImage = ({ item }) => (
-    <Image
-      source={{ uri: item }}
-      style={styles.image}
-      resizeMode="cover"
-    />
-  );
+  // FIXED: Updated renderImage to handle media objects
+  const renderImage = ({ item, index }) => {
+    const imageUri = getImageUri(item);
+    
+    console.log(`📸 Rendering image ${index}:`, {
+      original: item,
+      processedUri: imageUri
+    });
+
+    return (
+      <Image
+        source={{ uri: imageUri }}
+        style={styles.image}
+        resizeMode="cover"
+        onError={(error) => {
+          console.error(`📸 Image ${index} failed to load:`, error.nativeEvent.error);
+        }}
+        onLoad={() => {
+          console.log(`📸 Image ${index} loaded successfully`);
+        }}
+      />
+    );
+  };
 
   const renderDotIndicator = (index) => (
     <View
@@ -37,6 +70,14 @@ const ImageCarousel = ({ images, style }) => {
       ]}
     />
   );
+
+  // FIXED: Added safety check for images array
+  if (!images || images.length === 0) {
+    console.log('📸 ImageCarousel: No images provided');
+    return null;
+  }
+
+  console.log('📸 ImageCarousel received images:', images.length, 'items');
 
   return (
     <View style={[styles.container, style]}>

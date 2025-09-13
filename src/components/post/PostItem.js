@@ -19,15 +19,15 @@ const PostItem = ({ post, onComment, onShare, onBookmark, onUserPress, onEdit, o
   const likeState = useSelector(selectPostLike(postId));
   const pending = useSelector(selectLikePending(postId));
   const [localCommentsCount, setLocalCommentsCount] = useState(post?.comments || post?.commentsCount || post?.commentCount || 0);
-  const commentsCount = localCommentsCount;
   
-  // Use Redux state if available, otherwise fall back to post data
-  const likedByMe = likeState.isLiked || post?.isLiked || false;
-  const likeCount = likeState.count || post?.likes || 0;
+  // Use Redux state for likes, fallback to post data
+  const likedByMe = likeState.isLiked;
+  const likeCount = likeState.count;
 
   // Update local comment count when post changes
   useEffect(() => {
-    setLocalCommentsCount(post?.comments || post?.commentsCount || post?.commentCount || 0);
+    const newCount = post?.comments || post?.commentsCount || post?.commentCount || 0;
+    setLocalCommentsCount(newCount);
   }, [post?.comments, post?.commentsCount, post?.commentCount]);
   
   // Handle comment count update from CommentScreen
@@ -43,155 +43,178 @@ const PostItem = ({ post, onComment, onShare, onBookmark, onUserPress, onEdit, o
     }
   }, [postId, onCommentCountUpdate, localCommentsCount]);
 
-  // Display values come from Redux like state (initialized via initializePosts)
-
-  // Single handler for both like and unlike - always dispatches togglePostLike
+  // FIXED: Complete like handler
   const handleToggleLike = useCallback(async () => {
-    console.log('PostItem: Calling togglePostLike for postId:', postId, 'currentlyLiked:', likedByMe);
+    if (pending) return;
+
     try {
-      await dispatch(togglePostLike(postId)).unwrap();
+      console.log(`🚀 Toggling like for post ${postId}, currently liked: ${likedByMe}`);
+      const result = await dispatch(togglePostLike(postId));
+      
+      if (togglePostLike.fulfilled.match(result)) {
+        console.log('✅ Like toggle successful:', result.payload);
+      } else if (togglePostLike.rejected.match(result)) {
+        console.error('❌ Like toggle failed:', result.payload);
+        Alert.alert('Error', result.payload || 'Failed to update like status');
+        dispatch(clearError());
+      }
     } catch (error) {
-      Alert.alert('Error', error || 'Failed to update like status');
-      dispatch(clearError());
+      console.error('💥 Like error:', error);
+      Alert.alert('Error', 'Failed to update like status');
     }
-  }, [dispatch, postId, likedByMe]);
+  }, [dispatch, postId, likedByMe, pending]);
 
-
+  const formatCount = useCallback((count) => {
+    if (count >= 1000000) return `${(count / 1000000).toFixed(1)}M`;
+    if (count >= 1000) return `${(count / 1000).toFixed(1)}K`;
+    return count?.toString() || '0';
+  }, []);
 
   return (
-  <View style={styles.postContainer}>
-    {/* Post Header */}
-    <TouchableOpacity style={styles.postHeader} onPress={() => onUserPress(post.user)}>
-      <Image source={{ uri: post.user.avatar }} style={styles.postUserAvatar} />
-      <View style={styles.postUserInfo}>
-        <Text style={styles.postUsername}>{post.user.username}</Text>
-        <Text style={styles.postUserOccupation}>{post.user.occupation}</Text>
-      </View>
-      <TouchableOpacity 
-        style={styles.postMoreButton}
-        onPress={() => {
-          
-          if (post.user.id === currentUserId) {
-            Alert.alert(
-              'Post Options',
-              'What would you like to do?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Edit', onPress: () => onEdit(post) },
-                { text: 'Delete', style: 'destructive', onPress: () => onDelete(post.id) },
-              ]
-            );
-          } else {
-            
-            Alert.alert(
-              'Post Options',
-              'What would you like to do?',
-              [
-                { text: 'Cancel', style: 'cancel' },
-                { text: 'Report', style: 'destructive', onPress: () => console.log('Report post') },
-              ]
-            );
-          }
-        }}
-      >
-        <Icon name="ellipsis-h" size={16} color={colors.muted} />
-      </TouchableOpacity>
-    </TouchableOpacity>
-
-    <ImageCarousel images={post.images} style={styles.postImage} />
-
-    
-    <View style={styles.postActions}>
-      <View style={styles.leftActions}>
+    <View style={styles.container}>
+      {/* Post Header */}
+      <View style={styles.header}>
         <TouchableOpacity 
-          style={[styles.actionButton, pending && styles.disabledButton]}
-          disabled={pending}
-          onPress={handleToggleLike}
+          style={styles.userInfo}
+          onPress={() => onUserPress?.(post.author)}
+        >
+          <Image
+            source={{ uri: post.author?.profilePicture || 'https://via.placeholder.com/40' }}
+            style={styles.avatar}
+          />
+          <View>
+            <Text style={styles.username}>
+              {post.author?.userName || post.author?.fullName || 'Unknown User'}
+            </Text>
+            <Text style={styles.location}>{post.location || 'Unknown Location'}</Text>
+          </View>
+        </TouchableOpacity>
+        
+        {currentUserId === post.author?._id && (
+          <TouchableOpacity onPress={() => onEdit?.(post)}>
+            <Icon name="ellipsis-h" size={20} color={colors.textLight} />
+          </TouchableOpacity>
+        )}
+      </View>
+
+      {/* Post Content */}
+      {post.content && (
+        <Text style={styles.caption}>{post.content}</Text>
+      )}
+
+      {/* Post Media */}
+      {post.media && post.media.length > 0 && (
+        <ImageCarousel images={post.media} />
+      )}
+
+      {/* Action Buttons */}
+      <View style={styles.actions}>
+        <View style={styles.leftActions}>
+          {/* Like Button - FIXED */}
+          <TouchableOpacity 
+            style={[styles.actionButton, pending && styles.actionButtonDisabled]}
+            onPress={handleToggleLike}
+            disabled={pending}
+          >
+            <Icon 
+              name={likedByMe ? "heart" : "heart-o"} 
+              size={24} 
+              color={likedByMe ? "#FF3040" : colors.text}
+            />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => onComment?.(post)}
+          >
+            <Icon name="comment-o" size={24} color={colors.text} />
+          </TouchableOpacity>
+          
+          <TouchableOpacity 
+            style={styles.actionButton}
+            onPress={() => onShare?.(post._id)}
+          >
+            <Icon name="send-o" size={24} color={colors.text} />
+          </TouchableOpacity>
+        </View>
+        
+        <TouchableOpacity 
+          style={styles.actionButton}
+          onPress={() => onBookmark?.(post._id)}
         >
           <Icon 
-            name={likedByMe ? "heart" : "heart-o"} 
+            name={post.isBookmarked ? "bookmark" : "bookmark-o"} 
             size={24} 
-            color={likedByMe ? "#FF3040" : colors.text} 
-            style={pending && styles.pendingIcon}
+            color={colors.text} 
           />
         </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => onComment(postId)}
-        >
-          <Icon name="comment-o" size={24} color={colors.text} />
-        </TouchableOpacity>
-        <TouchableOpacity 
-          style={styles.actionButton} 
-          onPress={() => onShare(postId)}
-        >
-          <Icon name="send-o" size={24} color={colors.text} />
-        </TouchableOpacity>
       </View>
-      <TouchableOpacity onPress={() => onBookmark(postId)}>
-        <Icon 
-          name={post.isBookmarked ? "bookmark" : "bookmark-o"} 
-          size={24} 
-          color={colors.text} 
-        />
-      </TouchableOpacity>
-    </View>
 
-    <View style={styles.postStats}>
-      <Text style={styles.likesText}>
-        {Number(likeState.count || likeCount || 0).toLocaleString()} likes
-      </Text>
-      <View style={styles.captionContainer}>
-        <Text style={styles.captionUsername}>{post.user.username}</Text>
-        <Text style={styles.captionText}> {post.caption}</Text>
-      </View>
-      <TouchableOpacity onPress={() => onComment(postId)}>
-        <Text style={styles.commentsText}>
-          {commentsCount > 0 ? `View all ${commentsCount} comments` : 'Add a comment...'}
+      {/* Like Count */}
+      {likeCount > 0 && (
+        <Text style={styles.likeCount}>
+          {formatCount(likeCount)} {likeCount === 1 ? 'like' : 'likes'}
         </Text>
-      </TouchableOpacity>
-      <Text style={styles.timeText}>{post.timeAgo}</Text>
+      )}
+
+      {/* Comments Preview - FIXED */}
+      {localCommentsCount > 0 ? (
+        <TouchableOpacity onPress={() => onComment?.(post)}>
+          <Text style={styles.commentCount}>
+            View all {formatCount(localCommentsCount)} {localCommentsCount === 1 ? 'comment' : 'comments'}
+          </Text>
+        </TouchableOpacity>
+      ) : (
+        <TouchableOpacity onPress={() => onComment?.(post)}>
+          <Text style={styles.commentCount}>No comments yet</Text>
+        </TouchableOpacity>
+      )}
+
+      <Text style={styles.timestamp}>
+        {new Date(post.createdAt).toLocaleDateString()}
+      </Text>
     </View>
-  </View>
   );
 };
 
 const styles = StyleSheet.create({
-  postContainer: {
+  container: {
     backgroundColor: colors.bg,
-    marginBottom: 0,
+    marginBottom: spacing.m,
   },
-  postHeader: {
+  header: {
     flexDirection: 'row',
     alignItems: 'center',
-    paddingHorizontal: spacing.m,
-    paddingVertical: spacing.s,
+    justifyContent: 'space-between',
+    padding: spacing.m,
   },
-  postUserAvatar: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
+  userInfo: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
-  postUserInfo: {
-    flex: 1,
-    marginLeft: spacing.s,
+  avatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: spacing.s,
   },
-  postUsername: {
+  username: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
-  postUserOccupation: {
+  location: {
     fontSize: 12,
-    color: colors.muted,
+    color: colors.textLight,
   },
-  postMoreButton: {
-    padding: spacing.s,
+  caption: {
+    paddingHorizontal: spacing.m,
+    paddingBottom: spacing.s,
+    fontSize: 14,
+    color: colors.text,
+    lineHeight: 18,
   },
-  postImage: {
-    backgroundColor: colors.bgAlt,
-  },
-  postActions: {
+  actions: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
@@ -200,51 +223,33 @@ const styles = StyleSheet.create({
   },
   leftActions: {
     flexDirection: 'row',
-    gap: spacing.m,
+    alignItems: 'center',
   },
   actionButton: {
-    padding: 4,
+    marginRight: spacing.m,
+    padding: spacing.xs,
   },
-  disabledButton: {
-    opacity: 0.6,
+  actionButtonDisabled: {
+    opacity: 0.5,
   },
-  pendingIcon: {
-    opacity: 0.7,
-  },
-  postStats: {
+  likeCount: {
     paddingHorizontal: spacing.m,
-    paddingBottom: spacing.m,
-  },
-  likesText: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text,
-    marginBottom: 4,
-  },
-  captionContainer: {
-    flexDirection: 'row',
-    marginBottom: 4,
-  },
-  captionUsername: {
     fontSize: 14,
     fontWeight: '600',
     color: colors.text,
   },
-  captionText: {
+  commentCount: {
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.xs,
     fontSize: 14,
-    color: colors.text,
-    flex: 1,
+    color: colors.textLight,
   },
-  commentsText: {
-    fontSize: 14,
-    color: colors.muted,
-    marginBottom: 4,
-  },
-  timeText: {
+  timestamp: {
+    paddingHorizontal: spacing.m,
+    paddingBottom: spacing.s,
     fontSize: 12,
-    color: colors.muted,
+    color: colors.textLight,
   },
 });
 
 export default PostItem;
-  

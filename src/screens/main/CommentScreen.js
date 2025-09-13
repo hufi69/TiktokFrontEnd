@@ -8,7 +8,7 @@ import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
-import { addComment } from '../../store/slices/postsSlice';
+import { addComment, updateCommentCount } from '../../store/slices/postsSlice';
 import { toggleCommentLike, selectCommentLike, selectLikePending, initializeComments, clearError } from '../../store/slices/likesSlice';
 import { colors, spacing, radius } from '../../constants/theme';
 import { API_CONFIG, buildUrl } from '../../config/api';
@@ -134,17 +134,25 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     setEditModalVisible(true);
   };
 
+  // FIXED: fetchComments function - using your actual backend endpoint
   const fetchComments = useCallback(async (_cursorParam = null) => {
     try {
       setLoading(true);
-      const url = buildUrl(API_CONFIG.ENDPOINTS.GET_COMMENTS, { postId });
+      
+      // Using your actual backend endpoint - GET /api/v1/comments/get-comments/:postId
+      const url = buildUrl('/api/v1/comments/get-comments/:postId', { postId });
+      console.log('📥 Fetching comments from:', url);
+      
       const response = await fetch(url, {
         headers: {
           'Authorization': `Bearer ${token}`,
           'Content-Type': 'application/json',
         },
       });
+      
       const data = await response.json();
+      console.log('📥 Comments response:', data);
+      
       if (data.status === 'success') {
         const allComments = data.data?.comments || [];
         const topLevelComments = [];
@@ -162,26 +170,34 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
           }
         });
 
-        console.log('Fetched comments:', allComments.length, 'Top-level:', topLevelComments.length, 'Replies:', Object.keys(replies).length);
+        console.log('📊 Comments processed:', {
+          total: allComments.length,
+          topLevel: topLevelComments.length,
+          replies: Object.keys(replies).length
+        });
 
         // Initialize the likes state for all comments
         dispatch(initializeComments(allComments));
 
-        // Set state for both comments and replies
+        // Set state
         setComments(topLevelComments);
         setRepliesById(prev => ({ ...prev, ...replies }));
         setCursor(null);
 
+        // Update parent component with correct comment count
         if (onCommentCountUpdate) {
           onCommentCountUpdate(postId, allComments.length);
         }
+      } else {
+        throw new Error(data.message || 'Failed to fetch comments');
       }
     } catch (error) {
-      console.error('Failed to fetch comments:', error);
+      console.error('❌ Failed to fetch comments:', error);
+      Alert.alert('Error', 'Failed to load comments');
     } finally {
       setLoading(false);
     }
-  }, [postId, token, dispatch]);
+  }, [postId, token, dispatch, onCommentCountUpdate]);
 
   const loadInitial = useCallback(() => { fetchComments(); }, [fetchComments]);
 
@@ -196,18 +212,18 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
 
   useEffect(() => { if (postId) { loadInitial(); } }, [postId, loadInitial]);
 
+  // FIXED: handleSend function - using your actual backend endpoint with proper comment count sync
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
+    
     try {
       const parentId = replyTo ? getId(replyTo) : null;
+      let newComment;
       
-      // Use appropriate API endpoint based on whether it's a reply or comment
-      let result;
       if (parentId) {
-        // Reply to comment
-        const url = buildUrl(API_CONFIG.ENDPOINTS.COMMENT_REPLY);
-        const response = await fetch(url, {
+        // Reply to comment - POST /api/v1/comments/reply-comment
+        const response = await fetch(buildUrl('/api/v1/comments/reply-comment'), {
           method: 'POST',
           headers: {
             'Authorization': `Bearer ${token}`,
@@ -218,58 +234,57 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
             content: text
           })
         });
+        
         const data = await response.json();
-        result = { payload: data.data?.newComment };
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to create reply');
+        }
+        
+        newComment = data.data?.newComment;
       } else {
-        // Regular comment
-        result = await dispatch(addComment({ postId, content: text, parentId }));
+        // Create comment - POST /api/v1/comments/create-comment
+        const response = await fetch(buildUrl('/api/v1/comments/create-comment'), {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${token}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({ 
+            postId: postId,
+            content: text
+          }),
+        });
+
+        const data = await response.json();
+        if (!response.ok) {
+          throw new Error(data.message || 'Failed to create comment');
+        }
+        
+        newComment = data.data?.comment;
       }
       
-      const newComment = result?.payload?.comment || result?.payload;
       if (newComment) {
         const ensuredId = getId(newComment) || `temp-${Date.now()}`;
 
         if (parentId) {
           // Adding reply
-          console.log('📝 Adding reply to comment:', parentId);
-          setRepliesById(prev => {
-            const existing = prev[parentId] || [];
-            if (existing.some(r => getId(r) === ensuredId)) {
-              console.log('⚠️ Reply already exists, skipping');
-              return prev;
-            }
-            const updated = [{ ...newComment, _id: ensuredId }, ...existing];
-            console.log('✅ Reply added, new count:', updated.length);
-            return { ...prev, [parentId]: updated };
-          });
-          setExpandedReplyFor(prev => ({ ...prev, [parentId]: true }));
-          // Update parent comment's reply count
-          setComments(prev => prev.map(c => {
-            if (getId(c) === parentId) {
-              const newRepliesCount = (c.repliesCount || 0) + 1;
-              console.log('📈 Updated parent comment replies count:', newRepliesCount);
-              return { ...c, repliesCount: newRepliesCount };
-            }
-            return c;
+          setRepliesById(prev => ({
+            ...prev,
+            [parentId]: [{ ...newComment, _id: ensuredId }, ...(prev[parentId] || [])]
           }));
+          setExpandedReplyFor(prev => ({ ...prev, [parentId]: true }));
         } else {
           // Adding top-level comment
-          console.log('Adding top-level comment');
-          setComments(prev => {
-            if (prev.some(c => getId(c) === ensuredId)) {
-              console.log('Comment already exists, skipping');
-              return prev;
-            }
-            const updated = [{ ...newComment, _id: ensuredId }, ...prev];
-            console.log('Comment added, new total:', updated.length);
-            return updated;
-          });
+          setComments(prev => [{ ...newComment, _id: ensuredId }, ...prev]);
           
-          // Update post comment count
+          // FIXED: Update parent post's comment count
+          // Your backend automatically increments post.comments, so update the parent
           if (onCommentCountUpdate) {
             const totalComments = comments.length + 1 + Object.values(repliesById).flat().length;
-            console.log('Updated post comment count:', totalComments);
             onCommentCountUpdate(postId, totalComments);
+            
+            // Also update the Redux store
+            dispatch(updateCommentCount({ postId, count: totalComments }));
           }
         }
 
@@ -277,10 +292,10 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
         setReplyTo(null);
       }
     } catch (error) {
-      console.error('Failed to add comment:', error);
+      console.error('❌ Failed to create comment:', error);
       Alert.alert('Error', 'Failed to add comment. Please try again.');
     }
-  }, [input, replyTo, dispatch, postId, comments, onCommentCountUpdate, token]);
+  }, [input, replyTo, postId, token, comments.length, repliesById, onCommentCountUpdate, dispatch]);
 
   const toggleLike = useCallback(async (comment) => {
     const commentId = getId(comment);
@@ -297,7 +312,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
 
   const fetchReplies = useCallback(async (commentId) => {
     try {
-      const url = buildUrl(API_CONFIG.ENDPOINTS.COMMENT_REPLIES, { commentId });
+      const url = buildUrl('/api/v1/comments/get-replies/:commentId', { commentId });
       console.log('🔍 Fetching replies for comment:', commentId, 'URL:', url);
       
       const res = await fetch(url, { 
@@ -685,6 +700,7 @@ const styles = StyleSheet.create({
   actionsRow: { flexDirection: 'row', alignItems: 'center', marginTop: spacing.s },
   actionBtn: { flexDirection: 'row', alignItems: 'center' },
   actionTxt: { marginLeft: 6, color: colors.muted, fontSize: 12 },
+  actionText: { marginLeft: 6, color: colors.textLight, fontSize: 12 },
   replyLink: { color: colors.pink, fontSize: 12, fontWeight: '600' },
   time: { color: colors.textLight, fontSize: 12, marginLeft: spacing.s },
 
