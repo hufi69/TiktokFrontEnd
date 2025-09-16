@@ -1,4 +1,4 @@
-// Professional API Service Layer
+//api service
 import { CONFIG, buildUrl, apiRequest } from '../config';
 
 class ApiService {
@@ -7,7 +7,7 @@ class ApiService {
     this.debug = CONFIG.DEBUG;
   }
 
-  // Generic request method
+  // request method
   async request(endpoint, options = {}) {
     try {
       const { data, response } = await apiRequest(endpoint, options);
@@ -70,8 +70,6 @@ class ApiService {
 
     updateProfile: (userData, token) => {
       const formData = new FormData();
-
-      // Build payload under `data` key as JSON string per backend
       const payload = {};
       if (userData.fullName) payload.fullName = userData.fullName;
       if (userData.username) payload.userName = userData.username;
@@ -81,7 +79,7 @@ class ApiService {
       if (userData.country) payload.country = userData.country;
       formData.append('data', JSON.stringify(payload));
 
-      // Optional file field
+      // Optional
       const img = userData.avatar || userData.profileImage;
       if (img?.uri) {
         formData.append('profilePicture', {
@@ -238,6 +236,5 @@ class ApiService {
   };
 }
 
-// Export singleton instance
 export const apiService = new ApiService();
 export default apiService;

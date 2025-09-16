@@ -89,7 +89,7 @@ const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollow
         )}
       </View>
 
-      {/* Follow Someone Button - Only show for own profile */}
+      {/* Follow Someone Button  */}
       {isOwnProfile && (
         <View style={styles.followSomeoneContainer}>
           <TouchableOpacity style={styles.followSomeoneButton} onPress={onFollowSomeone}>
@@ -143,8 +143,7 @@ const UserListItem = ({ user, onPress, showFollowButton = false }) => {
   const [loading, setLoading] = useState(false);
 
   useEffect(() => {
-    // Check if current user is following this user
-    // This would be implemented based on your logic
+    //implement later 
   }, [user]);
 
   return (
@@ -240,9 +239,9 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   const userId = route?.params?.userId || currentUser?._id;
   const isOwnProfile = !route?.params?.userId || (userId === currentUser?._id);
 
-  // Debug logging for profile ownership
+  
   useEffect(() => {
-    console.log('👤 Profile Ownership Debug:', {
+    console.log(' Profile:', {
       routeUserId: route?.params?.userId,
       currentUserId: currentUser?._id,
       finalUserId: userId,
@@ -254,16 +253,15 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   useEffect(() => {
     if (userId) {
-      console.log('🔄 Fetching user profile for:', userId);
+      console.log(' Fetching user profile for:', userId);
       dispatch(fetchUserProfile(userId));
     }
   }, [userId, dispatch]);
 
-  // Refresh profile data when screen comes into focus (after editing)
   useEffect(() => {
     const refreshProfile = () => {
       if (userId) {
-        console.log('🔄 Refreshing profile data');
+        console.log(' Refreshing profile data');
         dispatch(fetchUserProfile(userId));
       }
     };
@@ -272,25 +270,23 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     refreshProfile();
   }, [userId, dispatch]);
 
-  // Refresh profile when component mounts or when userId changes
   useEffect(() => {
     if (userId) {
-      console.log('🔄 Profile screen mounted/focused, refreshing data');
+      console.log(' Profile screen mounted/focused, refreshing data');
       dispatch(fetchUserProfile(userId));
     }
   }, [userId, dispatch]);
 
-  // Refresh profile when refreshTrigger changes (after profile edit)
   useEffect(() => {
     if (userId && refreshTrigger > 0) {
-      console.log('🔄 Profile refresh triggered, refreshing data');
+      console.log(' Profile refresh triggered, refreshing data');
       dispatch(fetchUserProfile(userId));
     }
   }, [refreshTrigger, userId, dispatch]);
 
   // Debug logging
   useEffect(() => {
-    console.log('🔍 ProfileScreen Debug:', {
+    console.log(' ProfileScreen Debug:', {
       userId,
       currentUser: currentUser?._id,
       viewedUser: viewedUser?._id,
@@ -305,7 +301,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   // If no userId is available, show loading
   if (!userId) {
-    console.log('❌ No userId available');
+    console.log(' No userId available');
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -317,7 +313,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   // Show loading only if we're actually loading and don't have user data yet
   if (isLoading && !viewedUser && !currentUser) {
-    console.log('⏳ Showing loading screen');
+    console.log(' Showing loading screen');
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.loadingContainer}>
@@ -329,7 +325,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   useEffect(() => {
     if (userId) {
-      console.log('🔄 Fetching user profile for:', userId);
+      console.log(' Fetching user profile for:', userId);
       dispatch(fetchUserProfile(userId));
     }
   }, [userId, dispatch]);
@@ -368,42 +364,42 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   };
 
   const handleBack = () => {
-    console.log('🔙 Back button pressed');
+    console.log(' Back button pressed');
     if (onBack) {
       onBack();
     } else {
-      console.log('❌ No onBack handler available');
+      console.log('No onBack handler available');
     }
   };
 
   const handleEditProfile = () => {
-    console.log('✏️ Edit profile pressed');
+    console.log(' Edit profile pressed');
     if (onEditProfile) {
       onEditProfile();
     } else if (navigation && navigation.navigate) {
       navigation.navigate('EditProfile', { user: viewedUser });
     } else {
-      console.log('❌ No edit profile handler available');
+      console.log('No edit profile handler available');
     }
   };
 
   const handleSettings = () => {
-    console.log('⚙️ Settings pressed');
+    console.log(' Settings pressed');
     if (onSettings) {
       onSettings();
     } else if (navigation && navigation.navigate) {
       navigation.navigate('Settings');
     } else {
-      console.log('❌ No settings handler available');
+      console.log(' No settings handler available');
     }
   };
 
   const handleUserPress = (user) => {
-    console.log('👤 User pressed:', user._id);
+    console.log(' User pressed:', user._id);
     if (navigation && navigation.push) {
       navigation.push('Profile', { userId: user._id });
     } else {
-      console.log('❌ No navigation available for user press');
+      console.log(' No navigation available for user press');
     }
   };
 
@@ -422,7 +418,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
       } else {
         await dispatch(followUser(userId)).unwrap();
       }
-      // Refresh user profile to update follow status
+      
       await dispatch(fetchUserProfile(userId));
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to update follow status');
@@ -430,13 +426,13 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   };
 
   const handleFollowSomeone = () => {
-    console.log('👥 Follow someone pressed');
+    console.log('Follow someone pressed');
     if (onFollowSomeone) {
       onFollowSomeone();
     } else if (navigation && navigation.navigate) {
       navigation.navigate('FollowSomeone');
     } else {
-      console.log('❌ No follow someone handler available');
+      console.log(' No follow someone handler available');
     }
   };
 
@@ -513,7 +509,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   // If no user data is available at all, show a fallback
   if (!viewedUser && !currentUser) {
-    console.log('❌ No user data available');
+    console.log(' No user data available');
     return (
       <SafeAreaView style={styles.container}>
         <View style={styles.errorContainer}>

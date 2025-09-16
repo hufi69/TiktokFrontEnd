@@ -29,13 +29,15 @@ export const getPostComments = createAsyncThunk(
   }
 );
 
-// Create a new comment
+// Create a new parent comment
 export const createComment = createAsyncThunk(
   'comments/createComment',
   async ({ postId, content }, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      
+
+      console.log(' Creating parent comment:', { postId, content });
+
       const response = await fetch(buildUrl('/api/v1/comments/create-comment'), {
         method: 'POST',
         headers: {
@@ -46,12 +48,18 @@ export const createComment = createAsyncThunk(
       });
 
       const data = await response.json();
-      
+      console.log('📥Create comment response:', data);
+
       if (!response.ok) {
         throw new Error(data.message || 'Failed to create comment');
       }
 
-      return { postId, comment: data.data?.comment };
+      const comment = data.data?.comment;
+      if (!comment) {
+        throw new Error('No comment data received');
+      }
+
+      return { postId, comment, isReply: false };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -119,10 +127,12 @@ export const updateComment = createAsyncThunk(
 // Reply to a comment
 export const replyToComment = createAsyncThunk(
   'comments/replyToComment',
-  async ({ commentId, content }, { getState, rejectWithValue }) => {
+  async ({ commentId, content, postId }, { getState, rejectWithValue }) => {
     try {
       const { token } = getState().auth;
-      
+
+      console.log(' Creating reply:', { commentId, content, postId });
+
       const response = await fetch(buildUrl('/api/v1/comments/reply-comment'), {
         method: 'POST',
         headers: {
@@ -133,12 +143,23 @@ export const replyToComment = createAsyncThunk(
       });
 
       const data = await response.json();
-      
+      console.log(' Reply response:', data);
+
       if (!response.ok) {
         throw new Error(data.message || 'Failed to reply to comment');
       }
 
-      return { parentCommentId: commentId, reply: data.data?.newComment };
+      const reply = data.data?.newComment;
+      if (!reply) {
+        throw new Error('No reply data received');
+      }
+
+      return {
+        parentCommentId: commentId,
+        reply,
+        postId,
+        isReply: true
+      };
     } catch (error) {
       return rejectWithValue(error.message);
     }
@@ -218,14 +239,16 @@ const commentSlice = createSlice({
         }
       });
 
-    // Create Comment
+    // Create Comment (parent comment)
     builder
       .addCase(createComment.pending, (state) => {
         state.loading = true;
         state.error = null;
       })
       .addCase(createComment.fulfilled, (state, action) => {
-        const { postId, comment } = action.payload;
+        const { postId, comment, isReply } = action.payload;
+        console.log(` Comment created: ${isReply ? 'Reply' : 'Parent'} for post ${postId}`);
+
         if (state.postComments[postId]) {
           state.postComments[postId].comments.push(comment);
         }
@@ -263,9 +286,19 @@ const commentSlice = createSlice({
     // Reply to Comment
     builder
       .addCase(replyToComment.fulfilled, (state, action) => {
-        const { parentCommentId, reply } = action.payload;
+        const { parentCommentId, reply, postId } = action.payload;
+        console.log(`Reply created: ${reply._id} for comment ${parentCommentId} in post ${postId}`);
+
+        // Add reply to the parent comment's replies
         if (state.commentReplies[parentCommentId]) {
           state.commentReplies[parentCommentId].replies.push(reply);
+        } else {
+          // Initialize replies array if it doesn't exist
+          state.commentReplies[parentCommentId] = {
+            replies: [reply],
+            loading: false,
+            error: null
+          };
         }
       });
 

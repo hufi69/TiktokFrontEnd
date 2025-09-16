@@ -153,7 +153,7 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
   };
 
   const formatPhoneNumber = (text) => {
-    // Format phone number as (XXX) XXX-XXXX
+    //  phone number as (XXX) XXX-XXXX
     const cleaned = text.replace(/\D/g, '');
     if (cleaned.length === 0) return '';
     if (cleaned.length <= 3) return `(${cleaned}`;
@@ -335,7 +335,7 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
               returnKeyType="done"
             />
 
-            {/* Country Field - Only show in edit mode, read-only */}
+            {/* Country Field - CANt change in edit mode */}
             {isEditMode && (
               <View style={styles.countryField}>
                 <View style={styles.countryFieldContent}>

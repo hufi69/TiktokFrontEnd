@@ -186,13 +186,13 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
       console.log(' Update result:', result);
       
       if (updatePostAsync.fulfilled.match(result)) {
-        console.log('✅ Post updated successfully:', result.payload);
+        console.log(' Post updated successfully:', result.payload);
         Alert.alert('Success', 'Post updated successfully!');
         if (onPostUpdated) {
           onPostUpdated(result.payload.post);
         }
       } else if (updatePostAsync.rejected.match(result)) {
-        console.log('❌ Update failed:', result.error);
+        console.log(' Update failed:', result.error);
         const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to update post';
         Alert.alert('Error', errorMessage);
       }

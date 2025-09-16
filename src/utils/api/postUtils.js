@@ -1,10 +1,8 @@
 import { API_CONFIG } from '../../config/api';
-
-// Single source of truth for post transformation
 export const transformPost = (raw, userId) => {
-  // Debug: Log the raw post data to see what comment fields are available
+  
   if (raw && (raw.commentsCount > 0 || raw.comments?.length > 0 || raw.commentCount > 0)) {
-    console.log('📊 Raw post with comments:', {
+    console.log(' Raw post with comments:', {
       postId: raw._id,
       commentsCount: raw.commentsCount,
       commentCount: raw.commentCount,
@@ -40,9 +38,12 @@ export const transformPost = (raw, userId) => {
     caption: raw?.content || '',
     timeAgo: raw?.createdAt ?? '',        
     
-    // Only trust boolean likedByMe; otherwise default to false to avoid accidental DELETE
-    isLiked: typeof raw?.likedByMe === 'boolean' 
-      ? raw.likedByMe 
+    
+    isLiked: typeof raw?.likedByMe === 'boolean'
+      ? raw.likedByMe
+      : (typeof raw?.isLiked === 'boolean' ? raw.isLiked : false),
+    likedByMe: typeof raw?.likedByMe === 'boolean'
+      ? raw.likedByMe
       : (typeof raw?.isLiked === 'boolean' ? raw.isLiked : false),
     likeId: raw?.likeId || null,         
     isBookmarked: !!raw?.bookmarked,      
@@ -55,7 +56,7 @@ export const transformPost = (raw, userId) => {
   };
 };
 
-// Safe story building function
+// ignore this for now 
 export const buildStories = (basePosts, user) => {
   const yourAvatar = (() => {
     const pp = user?.profilePicture;
@@ -82,7 +83,7 @@ export const buildStories = (basePosts, user) => {
   return [yourStory, ...userStories];
 };
 
-// Safe story insertion for new stories
+// ignore this 
 export const insertNewStory = (prevStories, pickedUri) => {
   const [head, ...rest] = prevStories[0]?.isYourStory ? prevStories : [];
   const newStory = {

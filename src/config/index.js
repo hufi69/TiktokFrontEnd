@@ -1,17 +1,16 @@
-// 🎯 PRODUCTION-READY CONFIGURATION
-// Single file for all environment and API configuration
+// configuration
 
 // Environment Settings - Change CURRENT_ENV to switch environments
-// Using LOCAL for Android emulator - this will use 10.0.2.2:8000
+// local for Android emulator - this will use 10.0.2.2:8000
 const CURRENT_ENV = 'LOCAL'; // LOCAL | USB_DEBUG | NGROK | PRODUCTION
 
 // Optional .env override for API base URL when running on real devices
 let ENV_API_BASE_URL = undefined;
 try {
-  // eslint-disable-next-line global-require
+  
   ENV_API_BASE_URL = require('@env').API_BASE_URL;
 } catch (_e) {
-  // no-op if dotenv not configured in this build
+  
 }
 
 // For Android emulator, use 10.0.2.2 to access localhost
@@ -28,7 +27,7 @@ const ENVIRONMENTS = {
    PRODUCTION: { API_BASE_URL: 'https://your-production-api.com', DEBUG: false }
 };
 
-// API Endpoints - Organized by feature
+// Api Endpoints
 const API_ENDPOINTS = {
   // Auth
   AUTH_SIGNUP: '/api/v1/auth/signup',
@@ -61,7 +60,7 @@ const API_ENDPOINTS = {
   POST_GET: '/api/v1/posts/get-post/:id',
   POST_UPDATE: '/api/v1/posts/get-post/:id',
   POST_DELETE: '/api/v1/posts/get-post/:id',
-  POST_LIKE: '/api/v1/posts/:id/like',
+  POST_LIKE: '/api/v1/likes/like',
   
   // Likes (separate controller)
   LIKE_POST_ACTION: '/api/v1/likes/like',
@@ -97,7 +96,7 @@ const API_ENDPOINTS = {
 const getCurrentConfig = () => {
   const config = ENVIRONMENTS[CURRENT_ENV];
   if (!config) {
-    console.warn(`⚠️ Environment "${CURRENT_ENV}" not found, using LOCAL`);
+    console.warn(`Environment "${CURRENT_ENV}" not found, using LOCAL`);
     return ENVIRONMENTS.LOCAL;
   }
   return config;

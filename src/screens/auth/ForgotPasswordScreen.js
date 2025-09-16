@@ -21,14 +21,14 @@ const ForgotPasswordScreen = ({ onBack, onVerify }) => {
     setIsLoading(true);
     try {
       const result = await dispatch(forgotPassword({ email }));
-      console.log('🔧 Forgot password result:', result);
-      console.log('📦 Result payload:', result.payload);
+      console.log(' Forgot password result:', result);
+      console.log(' Result payload:', result.payload);
       
       if (forgotPassword.fulfilled.match(result)) {
         Alert.alert('Success', 'Password reset email sent!');
-        // Fix: Access resetToken from the correct location
+        // access resetToken 
         const resetToken = result.payload?.resetToken;
-        console.log('🔑 Reset token:', resetToken);
+        console.log(' Reset token:', resetToken);
         if (resetToken) {
           onVerify?.(resetToken);
         }

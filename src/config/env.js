@@ -2,7 +2,7 @@
 
 import { CONFIG } from './index';
 
-// Legacy configuration - redirects to new system
+// environment configuration
 export const ENV_CONFIG = {
   API_BASE_URL: CONFIG.API_BASE_URL,
   APP_NAME: CONFIG.APP_NAME,
@@ -12,7 +12,7 @@ export const ENV_CONFIG = {
   ...CONFIG.ENDPOINTS,
 };
 
-// Helper function to get full API URL
+// function to get full API URL
 export const getApiUrl = (endpoint) => {
   return `${ENV_CONFIG.API_BASE_URL}${endpoint}`;
 };

@@ -56,25 +56,25 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
 
     setIsLoading(true);
     try {
-      console.log('🔧 Creating post with:', { content: content.trim(), images: images.length });
+      console.log(' Creating post with:', { content: content.trim(), images: images.length });
       const result = await dispatch(createPost({
         content: content.trim(),
         images: images
       }));
       
-      console.log('📦 Create post result:', result);
+      console.log(' Create post result:', result);
       
       if (createPost.fulfilled.match(result)) {
-        console.log('✅ Post created successfully!');
+        console.log(' Post created successfully!');
         Alert.alert('Success', 'Post created successfully!');
         onPostCreated?.();
       } else if (createPost.rejected.match(result)) {
-        console.log('❌ Post creation failed:', result.error);
+        console.log(' Post creation failed:', result.error);
         const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to create post';
         Alert.alert('Error', errorMessage);
       }
     } catch (error) {
-      console.log('💥 Post creation error:', error);
+      console.log(' Post creation error:', error);
       Alert.alert('Error', error.message || 'Failed to create post');
     } finally {
       setIsLoading(false);

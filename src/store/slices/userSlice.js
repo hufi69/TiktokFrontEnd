@@ -46,8 +46,6 @@ export const updateUserProfile = createAsyncThunk(
       const { countryData } = getState().auth;
       
       const formData = new FormData();
-      
-      // backend expects all fields under a single `data` JSON field
       const payload = {};
       if (profileData.fullName) payload.fullName = profileData.fullName;
       if (profileData.username) payload.userName = profileData.username;
@@ -110,8 +108,8 @@ export const followUser = createAsyncThunk(
     try {
       const { token } = getState().auth;
       const url = buildUrl(API_CONFIG.ENDPOINTS.FOLLOW_USER);
-      console.log('🔧 Follow user URL:', url);
-      console.log('🔧 Follow user token:', token ? 'Token exists' : 'No token');
+      console.log(' Follow user :', url);
+      console.log(' Follow user token:', token ? 'Token exists' : 'No token');
       
       const response = await fetch(url, {
         method: 'POST',
@@ -123,10 +121,10 @@ export const followUser = createAsyncThunk(
       });
 
       const data = await response.json();
-      console.log('📥 Follow user response:', { status: response.status, data });
+      console.log(' Follow user response:', { status: response.status, data });
 
       if (!response.ok || (data.status && data.status !== 'success')) {
-        // If backend throws duplicate key or already-following error, treat as success (idempotent)
+        
         const msg = (data && (data.message || data.error || '')) || '';
         if (String(data?.code) === '11000' || /duplicate/i.test(msg) || /already/i.test(msg)) {
           console.log(' Already following; treating as success');
@@ -217,7 +215,7 @@ export const fetchUserFollowers = createAsyncThunk(
             const user = json?.data || json?.user || json;
             return user;
           } catch (_e) {
-            // Fallback to whatever we have populated
+            
             return f?.follower || f;
           }
         })
@@ -286,8 +284,7 @@ export const fetchMutualFollows = createAsyncThunk(
     try {
       const { token } = getState().auth;
 
-      // Backend mutuals expects req.body.userId on a GET, which isn't possible.
-      // Approximate mutuals client-side using current user's following and current user's followers.
+     // backend mutuals expects req.body.userId on a GET, which isn't possible. //remember this for next 
       const followingRes = await fetch(buildUrl(API_CONFIG.ENDPOINTS.ALL_FOLLOWING), {
         method: 'GET',
         headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
@@ -433,17 +430,17 @@ export const fetchAllUsers = createAsyncThunk(
       });
 
       const data = await response.json();
-      console.log('📥 Fetch users response:', { status: response.status, data });
+      console.log(' Fetch users response:', { status: response.status, data });
 
       if (!response.ok || (data.status && data.status !== 'success')) {
-        console.log('❌ Fetch users failed:', data);
+        console.log(' Fetch users failed:', data);
         return rejectWithValue(data.message || 'Failed to fetch users');
       }
 
-      console.log('✅ Fetch users successful:', data.data);
+      console.log(' Fetch users successful:', data.data);
       return data.data || [];
     } catch (error) {
-      console.error('💥 Fetch users error:', error);
+      console.error(' Fetch users error:', error);
       return rejectWithValue(error.message);
     }
   }

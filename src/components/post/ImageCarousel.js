@@ -14,14 +14,13 @@ const ImageCarousel = ({ images, style }) => {
   const [currentIndex, setCurrentIndex] = useState(0);
   const flatListRef = useRef(null);
 
-  // FIXED: Function to handle both string URLs and media objects
   const getImageUri = (media) => {
     // If it's already a string URL
     if (typeof media === 'string') {
       return media.startsWith('http') ? media : `http://10.0.2.2:8000${media}`;
     }
     
-    // If it's a media object from backend
+    // If media is obj url property
     if (media && typeof media === 'object' && media.url) {
       const url = media.url;
       return url.startsWith('http') ? url : `http://10.0.2.2:8000${url}`;
@@ -37,7 +36,7 @@ const ImageCarousel = ({ images, style }) => {
     setCurrentIndex(index);
   };
 
-  // FIXED: Updated renderImage to handle media objects
+  // updated renderImage to handle media objects
   const renderImage = ({ item, index }) => {
     const imageUri = getImageUri(item);
     
@@ -71,7 +70,7 @@ const ImageCarousel = ({ images, style }) => {
     />
   );
 
-  // FIXED: Added safety check for images array
+  // for the handling of the images array
   if (!images || images.length === 0) {
     console.log('📸 ImageCarousel: No images provided');
     return null;

@@ -61,15 +61,14 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
-    // Fetch all users when component mounts
     dispatch(fetchAllUsers());
   }, [dispatch]);
 
   const handleToggleFollow = async (userId) => {
     try {
-      console.log('🔧 Toggle follow started for user:', userId);
+      console.log(' Toggle follow started for user:', userId);
       const user = allUsers.find(u => u._id === userId);
-      console.log('👤 User to toggle:', user);
+      console.log(' User to toggle:', user);
       
       if (user.isFollowing) {
         console.log(' Unfollowing user...');
@@ -93,15 +92,13 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
   );
 
   const handleUserPress = (user) => {
-    // Navigate to user's profile
-    console.log('👤 Navigate to user profile:', user._id);
+    console.log(' Navigate to user profile:', user._id);
     if (onUserProfilePress) {
       onUserProfilePress(user);
     }
   };
 
   const handleContinue = () => {
-    // Navigate to home feed after following users
     onContinue?.({ followingUsers: allUsers.filter(u => u.isFollowing) });
   };
 
@@ -160,7 +157,7 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
           />
         )}
 
-        {/* Continue Button */}
+        
                          <TouchableOpacity
                    style={styles.continueButton}
                    onPress={handleContinue}

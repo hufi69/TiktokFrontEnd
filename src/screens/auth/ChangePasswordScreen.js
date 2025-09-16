@@ -24,7 +24,7 @@ const ChangePasswordScreen = ({ onBack, onSuccess }) => {
       return;
     }
 
-    if (newPassword.length < 6) {
+    if (newPassword.length < 8) {
       Alert.alert('Error', 'New password must be at least 6 characters');
       return;
     }

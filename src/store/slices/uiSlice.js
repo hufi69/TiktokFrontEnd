@@ -5,24 +5,22 @@ const initialState = {
   currentScreen: 'splash',
   activeTab: 'home',
   selectedUserId: null,
-  followSomeoneSource: null, // Track where user came from: 'profile' | 'onboarding'
-  
-  // Loading states
+  followSomeoneSource: null, // tracking user caming from profile or after edit screen 
+
   isLoading: false,
   loadingMessage: '',
   
-  // Modal states
   showStoryViewer: false,
   showActionMenu: false,
   showReplyModal: false,
   showShareModal: false,
   
-  // Story viewer state
+  
   currentStoryIndex: 0,
   currentStoryUser: null,
   
   // Theme and preferences
-  theme: 'light', // 'light' | 'dark'
+  theme: 'light', 
   language: 'en',
   
   // App state
@@ -45,7 +43,7 @@ const uiSlice = createSlice({
   name: 'ui',
   initialState,
   reducers: {
-    // Navigation actions
+    
     setCurrentScreen: (state, action) => {
       state.currentScreen = action.payload;
     },
@@ -59,7 +57,7 @@ const uiSlice = createSlice({
       state.followSomeoneSource = action.payload;
     },
     
-    // Loading actions
+    
     setLoading: (state, action) => {
       state.isLoading = action.payload;
     },
@@ -81,7 +79,7 @@ const uiSlice = createSlice({
       state.showShareModal = action.payload;
     },
     
-    // Story viewer actions
+    // Skip this for now 
     setCurrentStoryIndex: (state, action) => {
       state.currentStoryIndex = action.payload;
     },

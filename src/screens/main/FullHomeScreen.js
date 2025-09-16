@@ -42,12 +42,10 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
   const [showStoryViewer, setShowStoryViewer] = useState(false);
   const [currentStoryIndex, setCurrentStoryIndex] = useState(0);
   const [stories, setStories] = useState([]);
-
-  // Keep local posts in sync with Redux store (source of truth)
   useEffect(() => {
     if (Array.isArray(reduxPosts)) {
       console.log('Syncing local posts with Redux posts, count:', reduxPosts.length);
-      // Create a new array reference to ensure React detects the change
+    
       setPosts([...reduxPosts]);
     }
   }, [reduxPosts]);
@@ -57,7 +55,7 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
     loadPosts();
   }, [loadPosts]);
 
-  // Rebuild stories when posts change
+  
   useEffect(() => {
     loadStories();
   }, [loadStories]);
@@ -72,7 +70,7 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
         const list = result.payload || [];
         console.log(' Posts loaded:', list);
         
-        // Initialize like states for all posts
+        
         if (list.length > 0) {
           console.log('Initializing post like states for', list.length, 'posts');
           dispatch(initializePosts(list));
@@ -201,7 +199,7 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
       }
     });
   };
-
+//IGNORE THE STORIES CODE FOR NOW AS RIGHT NOW NOT USING IT
   const openGalleryForStory = async () => {
     const hasPermission = await requestStoragePermission();
     if (!hasPermission) {
@@ -253,18 +251,18 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
 
   const handleLike = useCallback(async (postId) => {
     try {
-      console.log('🚀 FullHomeScreen - handleLike called for post:', postId);
-      console.log('🚀 FullHomeScreen - About to dispatch togglePostLike...');
+      console.log('FullHomeScreen - handleLike called for post:', postId);
+      console.log('FullHomeScreen - About to dispatch togglePostLike...');
       const result = await dispatch(togglePostLike(postId));
-      console.log('🚀 FullHomeScreen - togglePostLike result:', result);
+      console.log(' FullHomeScreen - togglePostLike result:', result);
       
       if (result.type.endsWith('/fulfilled')) {
-        console.log('✅ Post like action completed successfully');
+        console.log(' Post like action completed successfully');
       } else if (result.type.endsWith('/rejected')) {
-        console.error('❌ Post like action failed:', result.payload);
+        console.error(' Post like action failed:', result.payload);
       }
     } catch (error) {
-      console.error('💥 FullHomeScreen - Like error:', error);
+      console.error(' FullHomeScreen - Like error:', error);
     }
   }, [dispatch]);
 
@@ -320,14 +318,14 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
   }, [onEditPost]);
 
   const handlePostUpdated = useCallback((updatedPost) => {
-    console.log('🔄 Refreshing posts after update:', updatedPost);
-    console.log('🔄 Updated post ID:', updatedPost._id || updatedPost.id);
-    console.log('🔄 Updated post content:', updatedPost.content);
-    console.log('🔄 Updated post caption:', updatedPost.caption);
+    console.log(' Refreshing posts after update:', updatedPost);
+    console.log(' Updated post ID:', updatedPost._id || updatedPost.id);
+    console.log('Updated post content:', updatedPost.content);
+    console.log('Updated post caption:', updatedPost.caption);
     
     // Update the specific post in local state
     setPosts(prevPosts => {
-      console.log('🔄 Current posts count:', prevPosts.length);
+      console.log(' Current posts count:', prevPosts.length);
       const updatedPosts = prevPosts.map(post => {
         const postId = post._id || post.id;
         const updatedPostId = updatedPost._id || updatedPost.id;

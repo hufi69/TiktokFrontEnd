@@ -9,7 +9,12 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
 import { addComment, updateCommentCount } from '../../store/slices/postsSlice';
-import { toggleCommentLike, selectCommentLike, selectLikePending, initializeComments, clearError } from '../../store/slices/likesSlice';
+import {
+  toggleCommentLike,
+  selectCommentLike,
+  selectLikePending,
+  initializeComments
+} from '../../store/slices/likesSlice';
 import { colors, spacing, radius } from '../../constants/theme';
 import { API_CONFIG, buildUrl } from '../../config/api';
 import { useSelector } from 'react-redux';
@@ -134,14 +139,12 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     setEditModalVisible(true);
   };
 
-  // FIXED: fetchComments function - using your actual backend endpoint
+  // FETCH COMMENTS
   const fetchComments = useCallback(async (_cursorParam = null) => {
     try {
       setLoading(true);
-      
-      // Using your actual backend endpoint - GET /api/v1/comments/get-comments/:postId
       const url = buildUrl('/api/v1/comments/get-comments/:postId', { postId });
-      console.log('📥 Fetching comments from:', url);
+      console.log(' Fetching comments from:', url);
       
       const response = await fetch(url, {
         headers: {
@@ -151,7 +154,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
       });
       
       const data = await response.json();
-      console.log('📥 Comments response:', data);
+      console.log(' Comments response:', data);
       
       if (data.status === 'success') {
         const allComments = data.data?.comments || [];
@@ -192,7 +195,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
         throw new Error(data.message || 'Failed to fetch comments');
       }
     } catch (error) {
-      console.error('❌ Failed to fetch comments:', error);
+      console.error(' Failed to fetch comments:', error);
       Alert.alert('Error', 'Failed to load comments');
     } finally {
       setLoading(false);
@@ -212,7 +215,8 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
 
   useEffect(() => { if (postId) { loadInitial(); } }, [postId, loadInitial]);
 
-  // FIXED: handleSend function - using your actual backend endpoint with proper comment count sync
+
+  // handleSend function
   const handleSend = useCallback(async () => {
     const text = input.trim();
     if (!text) return;
@@ -222,7 +226,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
       let newComment;
       
       if (parentId) {
-        // Reply to comment - POST /api/v1/comments/reply-comment
+        // Reply to comment  POST API endpoint
         const response = await fetch(buildUrl('/api/v1/comments/reply-comment'), {
           method: 'POST',
           headers: {
@@ -267,23 +271,18 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
         const ensuredId = getId(newComment) || `temp-${Date.now()}`;
 
         if (parentId) {
-          // Adding reply
           setRepliesById(prev => ({
             ...prev,
             [parentId]: [{ ...newComment, _id: ensuredId }, ...(prev[parentId] || [])]
           }));
           setExpandedReplyFor(prev => ({ ...prev, [parentId]: true }));
         } else {
-          // Adding top-level comment
-          setComments(prev => [{ ...newComment, _id: ensuredId }, ...prev]);
           
-          // FIXED: Update parent post's comment count
-          // Your backend automatically increments post.comments, so update the parent
+          setComments(prev => [{ ...newComment, _id: ensuredId }, ...prev]);
+          // update parent post's comment count
           if (onCommentCountUpdate) {
             const totalComments = comments.length + 1 + Object.values(repliesById).flat().length;
             onCommentCountUpdate(postId, totalComments);
-            
-            // Also update the Redux store
             dispatch(updateCommentCount({ postId, count: totalComments }));
           }
         }
@@ -292,20 +291,16 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
         setReplyTo(null);
       }
     } catch (error) {
-      console.error('❌ Failed to create comment:', error);
+      console.error(' Failed to create comment:', error);
       Alert.alert('Error', 'Failed to add comment. Please try again.');
     }
   }, [input, replyTo, postId, token, comments.length, repliesById, onCommentCountUpdate, dispatch]);
 
-  const toggleLike = useCallback(async (comment) => {
-    const commentId = getId(comment);
-    try {
-      await dispatch(toggleCommentLike(commentId)).unwrap();
-    } catch (error) {
-      Alert.alert('Error', error || 'Failed to update comment like status');
-      dispatch(clearError());
-    }
+  
+  const handleCommentLike = useCallback((commentId) => {
+    dispatch(toggleCommentLike(commentId));
   }, [dispatch]);
+
 
   const formatCount = (n) => n >= 1_000_000 ? (n / 1_000_000).toFixed(1) + 'M' : n >= 1_000 ? (n / 1_000).toFixed(1) + 'K' : String(n);
   const timeAgo = (iso) => { const t = new Date(iso).getTime(); if (!t) return ''; const diffMs = Date.now() - t; const m = Math.floor(diffMs / 60000); if (m < 1) return 'now'; if (m < 60) return `${m}m`; const h = Math.floor(m / 60); if (h < 24) return `${h}h`; const d = Math.floor(h / 24); if (d < 7) return `${d}d`; const w = Math.floor(d / 7); if (w < 4) return `${w}w`; const mo = Math.floor(d / 30); if (mo < 12) return `${mo}mo`; const y = Math.floor(d / 365); return `${y}y`; };
@@ -313,7 +308,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   const fetchReplies = useCallback(async (commentId) => {
     try {
       const url = buildUrl('/api/v1/comments/get-replies/:commentId', { commentId });
-      console.log('🔍 Fetching replies for comment:', commentId, 'URL:', url);
+      console.log(' Fetching replies for comment:', commentId, 'URL:', url);
       
       const res = await fetch(url, { 
         method: 'GET', 
@@ -324,15 +319,15 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
       });
       
       const json = await res.json();
-      console.log('📥 Replies response:', json);
+      console.log(' Replies response:', json);
       
       if (!res.ok) {
-        console.error('❌ Failed to fetch replies:', json?.message);
+        console.error(' Failed to fetch replies:', json?.message);
         throw new Error(json?.message || 'Failed to fetch replies');
       }
       
       const list = json?.data?.replies || [];
-      console.log('📝 Fetched replies:', list.length);
+      console.log(' Fetched replies:', list.length);
       
       // Initialize likes state for replies too
       if (list.length > 0) {
@@ -386,7 +381,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   }, [repliesCursorById, repliesLoadingMore, fetchReplies]);
 
   // Separate component to avoid Rules of Hooks violation
-  const ReplyItem = React.memo(({ item: rep, comments, toggleLike, setReplyTo, inputRef, formatCount, timeAgo }) => {
+  const ReplyItem = React.memo(({ item: rep, comments, handleCommentLike, setReplyTo, inputRef, formatCount, timeAgo }) => {
     const repId = getId(rep);
     const likeState = useSelector(selectCommentLike(repId));
     const pending = useSelector(selectLikePending(repId));
@@ -406,19 +401,27 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
           </View>
           <Text style={styles.replyText}>{rep.content}</Text>
           
-          {/* Reply actions */}
+          {/*  Reply Like Button */}
           <View style={[styles.actionsRow, { marginTop: spacing.xs }]}>
-            <TouchableOpacity 
-              onPress={() => toggleLike(rep)} 
+            <TouchableOpacity
+              onPress={() => handleCommentLike(repId)}
               style={styles.actionBtn}
-              disabled={pending}
             >
               <Icon 
                 name={isLiked ? "heart" : "heart-o"} 
                 size={12} 
                 color={isLiked ? "#FF3040" : colors.muted} 
+                style={pending && styles.iconDisabled}
               />
-              <Text style={styles.actionTxt}>{formatCount(likeCount)}</Text>
+              {likeCount > 0 && (
+                <Text style={[
+                  styles.actionTxt, 
+                  isLiked && styles.likedText,
+                  pending && styles.textDisabled
+                ]}>
+                  {formatCount(likeCount)}
+                </Text>
+              )}
             </TouchableOpacity>
             
             <TouchableOpacity
@@ -444,7 +447,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     <ReplyItem 
       item={item}
       comments={comments}
-      toggleLike={toggleLike}
+      handleCommentLike={handleCommentLike}
       setReplyTo={setReplyTo}
       inputRef={inputRef}
       formatCount={formatCount}
@@ -452,11 +455,10 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     />
   );
 
-  // Separate component to avoid Rules of Hooks violation
   const CommentItem = React.memo(({ 
     item, 
     currentUser,
-    toggleLike, 
+    handleCommentLike, 
     setReplyTo, 
     inputRef, 
     formatCount, 
@@ -511,11 +513,11 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
 
           <Text style={styles.commentText}>{item.content}</Text>
 
+          {/*  Comment Like Button */}
           <View style={styles.actionsRow}>
-            <TouchableOpacity 
-              onPress={() => toggleLike(item)} 
-              style={[styles.actionBtn, pending && styles.disabledButton]}
-              disabled={pending}
+            <TouchableOpacity
+              onPress={() => handleCommentLike(cid)}
+              style={styles.actionBtn}
             >
               <Icon 
                 name={isLiked ? "heart" : "heart-o"} 
@@ -523,9 +525,15 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
                 color={isLiked ? "#FF3040" : colors.textLight}
                 style={pending && styles.pendingIcon}
               />
-              <Text style={[styles.actionText, isLiked && { color: "#FF3040" }, pending && styles.pendingText]}>
-                {formatCount(likeCount)}
-              </Text>
+              {likeCount > 0 && (
+                <Text style={[
+                  styles.actionText, 
+                  isLiked && { color: "#FF3040" }, 
+                  pending && styles.pendingText
+                ]}>
+                  {formatCount(likeCount)}
+                </Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity
@@ -582,7 +590,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     <CommentItem 
       item={item}
       currentUser={user}
-      toggleLike={toggleLike}
+      handleCommentLike={handleCommentLike}
       setReplyTo={setReplyTo}
       inputRef={inputRef}
       formatCount={formatCount}
@@ -736,8 +744,22 @@ const styles = StyleSheet.create({
   pendingText: {
     opacity: 0.7,
   },
+  
+  actionBtnDisabled: {
+    opacity: 0.6,
+  },
+  iconDisabled: {
+    opacity: 0.7,
+  },
+  textDisabled: {
+    opacity: 0.7,
+  },
+  likedText: {
+    color: '#FF3040',
+    fontWeight: '600',
+  },
 
-  // Modal Styles
+  // Modal Styling
   modalContainer: {
     flex: 1,
     justifyContent: 'center',

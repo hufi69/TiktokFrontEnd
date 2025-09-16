@@ -1,4 +1,4 @@
-// Professional Constants Organization
+// constants
 export * from './theme';
 
 

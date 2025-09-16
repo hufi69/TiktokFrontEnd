@@ -35,20 +35,20 @@ export const loginUser = createAsyncThunk(
         body: JSON.stringify(loginPayload),
       });
 
-      console.log('📥 Response status:', response.status);
+      console.log(' Response status:', response.status);
       const data = await response.json();
-      console.log('📥 Response data:', data);
+      console.log(' Response data:', data);
 
-      // Check if response is successful (200-299) or if data indicates success
+      
       if (!response.ok || (data.status && data.status !== 'success')) {
-        console.log('❌ API error:', data);
+        console.log(' API error:', data);
         const errorMessage = data.message || data.error || 'Login failed';
         return rejectWithValue(errorMessage);
       }
 
-      console.log('✅ Login successful:', data);
+      console.log('Login successful:', data);
 
-      // Store token and user data in AsyncStorage
+      // Store token and user data in AsyncStoragee
       if (data.token) {
         await storeAuthToken(data.token);
       }
@@ -58,20 +58,20 @@ export const loginUser = createAsyncThunk(
 
       return data;
     } catch (error) {
-      console.log('💥 Login network error:', error);
-      console.log('💥 Error name:', error.name);
-      console.log('💥 Error message:', error.message);
-      console.log('💥 Error stack:', error.stack);
       
-      // Check if it's a network error
+      console.log(' Login network error:', error);
+      console.log(' Error name:', error.name);
+      console.log(' Error message:', error.message);
+      console.log(' Error stack:', error.stack);
+      
       if (error.message.includes('Network request failed')) {
-        console.log('🌐 Network request failed - checking connectivity...');
-        // Try to make a simple request to test connectivity
+        console.log(' Network request failed - checking connectivity...');
+        
         try {
           const testResponse = await fetch('https://httpbin.org/get');
-          console.log('✅ Test request successful:', testResponse.status);
+          console.log(' Test request successful:', testResponse.status);
         } catch (testError) {
-          console.log('❌ Test request failed:', testError.message);
+          console.log(' Test request failed:', testError.message);
         }
       }
       
@@ -84,16 +84,15 @@ export const signupUser = createAsyncThunk(
   'auth/signupUser',
   async (userData, { rejectWithValue }) => {
     try {
-      console.log('🔧 Signup thunk called with:', userData);
+      console.log(' Signup thunk called with:', userData);
       
-      // Your API expects: { email, password }
       const signupPayload = {
         email: userData.email,
         password: userData.password
       };
 
-      console.log('📤 Sending payload:', signupPayload);
-      console.log('🌐 API URL:', buildUrl(API_CONFIG.ENDPOINTS.SIGNUP));
+      console.log(' Sending payload:', signupPayload);
+      console.log(' API URL:', buildUrl(API_CONFIG.ENDPOINTS.SIGNUP));
 
       const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.SIGNUP), {
         method: 'POST',
@@ -103,21 +102,21 @@ export const signupUser = createAsyncThunk(
         body: JSON.stringify(signupPayload),
       });
 
-      console.log('📥 Response status:', response.status);
+      console.log('Response status:', response.status);
       const data = await response.json();
-      console.log('📥 Response data:', data);
+      console.log('Response data:', data);
 
-      // Check if response is successful (200-299) or if data indicates success
+      
       if (!response.ok || (data.status && data.status !== 'success')) {
-        console.log('❌ API error:', data);
+        console.log(' API error:', data);
         const errorMessage = data.message || data.error || 'Signup failed';
         return rejectWithValue(errorMessage);
       }
 
-      console.log('✅ Signup successful:', data);
+      console.log(' Signup successful:', data);
       return data;
     } catch (error) {
-      console.log('💥 Network error:', error);
+      console.log(' Network error:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -127,7 +126,7 @@ export const verifyOTP = createAsyncThunk(
   'auth/verifyOTP',
   async (otpData, { rejectWithValue }) => {
     try {
-      // Your API expects: { otp }
+      
       const otpPayload = {
         otp: otpData.otp
       };
@@ -142,7 +141,7 @@ export const verifyOTP = createAsyncThunk(
 
       const data = await response.json();
 
-      // Check if response is successful (200-299) or if data indicates success
+      
       if (!response.ok || (data.status && data.status !== 'success')) {
         const errorMessage = data.message || data.error || 'OTP verification failed';
         return rejectWithValue(errorMessage);
@@ -168,7 +167,7 @@ export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
   async (emailData, { rejectWithValue }) => {
     try {
-      // Handle both string and object formats
+      
       const email = typeof emailData === 'string' ? emailData : emailData.email;
       
       const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.FORGOT_PASSWORD), {
@@ -196,7 +195,7 @@ export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
   async ({ token, password, newPassword, confirmNewPassword }, { rejectWithValue }) => {
     try {
-      // Backend expects newPassword and confirmNewPassword; if only password provided, use it for both
+      
       const body = {
         newPassword: newPassword || password,
         confirmNewPassword: confirmNewPassword || password,
@@ -255,14 +254,11 @@ export const googleLogin = createAsyncThunk(
   'auth/googleLogin',
   async (_, { rejectWithValue }) => {
     try {
-      // For React Native, we'll need to use a WebView or deep linking
-      // For now, we'll redirect to the backend Google login URL
+      
+      //implement later
       const googleLoginUrl = buildUrl(API_CONFIG.ENDPOINTS.GOOGLE_LOGIN);
       
-      // In a real implementation, you would:
-      // 1. Open WebView with Google OAuth URL
-      // 2. Handle the callback with the token
-      // 3. Store the token and user data
+      //implement later
       
       // For now, we'll return a placeholder
       return { message: 'Google login initiated' };
@@ -278,7 +274,7 @@ export const googleCalendarAuth = createAsyncThunk(
     try {
       const googleCalendarUrl = buildUrl(API_CONFIG.ENDPOINTS.GOOGLE_CALENDAR);
       
-      // Similar to googleLogin, this would open a WebView
+      //implement later
       return { message: 'Google Calendar auth initiated' };
     } catch (error) {
       return rejectWithValue(error.message);
@@ -291,7 +287,7 @@ export const verifyToken = createAsyncThunk(
     try {
       let { token, user } = getState().auth;
 
-      // If no token in state, try to get from AsyncStorage
+      
       if (!token) {
         token = await getAuthToken();
         if (!token) {
@@ -299,7 +295,7 @@ export const verifyToken = createAsyncThunk(
         }
       }
 
-      // Hit any protected endpoint to validate token (backend has no /verify-token)
+      
       const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.VERIFY_TOKEN), {
         method: 'GET',
         headers: {
@@ -308,14 +304,14 @@ export const verifyToken = createAsyncThunk(
         },
       });
 
-      // If not OK, treat as invalid token
+      
       if (!response.ok) {
         await removeAuthToken();
         await removeUserData();
         return rejectWithValue('Token verification failed');
       }
 
-      // Keep existing user from storage/state; backend endpoint doesn't return user here
+      //use existing user from storage/state
       const storedUser = user || (await getUserData());
       return { status: 'success', user: storedUser };
     } catch (error) {
@@ -330,7 +326,7 @@ export const resendOTP = createAsyncThunk(
   'auth/resendOTP',
   async (email, { rejectWithValue }) => {
     try {
-      console.log('🔧 Resend OTP called for:', email);
+      console.log(' Resend OTP called for:', email);
       
       const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.RESEND_OTP), {
         method: 'POST',
@@ -341,17 +337,17 @@ export const resendOTP = createAsyncThunk(
       });
 
       const data = await response.json();
-      console.log('📥 Resend OTP response:', data);
+      console.log(' Resend OTP response:', data);
 
       if (!response.ok || (data.status && data.status !== 'success')) {
         const errorMessage = data.message || data.error || 'Failed to resend OTP';
         return rejectWithValue(errorMessage);
       }
 
-      console.log('✅ OTP resent successfully');
+      console.log(' OTP resent successfully');
       return data;
     } catch (error) {
-      console.log('💥 Resend OTP error:', error);
+      console.log(' Resend OTP error:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -374,17 +370,17 @@ export const logoutUser = createAsyncThunk(
   'auth/logoutUser',
   async (_, { rejectWithValue }) => {
     try {
-      console.log('🔧 Logging out user...');
+      console.log(' Logging out user...');
       
       // Clear AsyncStorage
       await removeAuthToken();
       await removeUserData();
       await removeCountryData();
       
-      console.log('✅ AsyncStorage cleared successfully');
+      console.log(' AsyncStorage cleared successfully');
       return true;
     } catch (error) {
-      console.error('❌ Logout error:', error);
+      console.error(' Logout error:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -584,7 +580,7 @@ const authSlice = createSlice({
           state.token = action.payload.token;
           state.countryData = action.payload.countryData;
           state.isAuthenticated = true;
-          console.log('✅ Stored auth loaded successfully:', {
+          console.log('Stored auth loaded successfully:', {
             user: action.payload.user?.email,
             hasCountry: !!action.payload.countryData,
             country: action.payload.countryData?.value
@@ -601,10 +597,10 @@ const authSlice = createSlice({
         state.isTokenVerified = false;
         state.error = null;
         state.countryData = null;
-        console.log('✅ User logged out successfully');
+        console.log(' User logged out successfully');
       })
       .addCase(logoutUser.rejected, (state, action) => {
-        console.error('❌ Logout failed:', action.payload);
+        console.error(' Logout failed:', action.payload);
         // Even if logout fails, clear the state
         state.user = null;
         state.token = null;
@@ -659,12 +655,12 @@ const authSlice = createSlice({
         state.error = action.payload;
       });
 
-    // Handle updateUserProfile from userSlice
+    
     builder
       .addCase(updateUserProfile.fulfilled, (state, action) => {
-        // Update the auth user state when profile is updated
+        
         state.user = action.payload;
-        console.log('✅ Auth user updated after profile update:', action.payload);
+        console.log('Auth user updated after profile update:', action.payload);
       });
   },
 });
