@@ -12,43 +12,29 @@ import {
   removeCountryData
 } from '../../utils/helpers/storage';
 import { updateUserProfile } from './userSlice';
+import { 
+  signIn, 
+  signUp, 
+  verifyOTP as verifyOTPApi, 
+  resendOTP as resendOTPApi, 
+  forgotPassword as forgotPasswordApi, 
+  resetPassword as resetPasswordApi, 
+  changePassword as changePasswordApi, 
+  googleLogin as googleLoginApi, 
+  verifyToken as verifyTokenApi 
+} from '../../services/api';
 
 // Async thunks for API calls
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
     try {
+      console.log('Login started with:', credentials.email);
       
-      const loginPayload = {
-        email: credentials.email,
-        password: credentials.password
-      };
-
-      
-
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.LOGIN), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Accept': 'application/json',
-        },
-        body: JSON.stringify(loginPayload),
-      });
-
-      console.log(' Response status:', response.status);
-      const data = await response.json();
-      console.log(' Response data:', data);
-
-      
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        console.log(' API error:', data);
-        const errorMessage = data.message || data.error || 'Login failed';
-        return rejectWithValue(errorMessage);
-      }
-
+      const data = await signIn(credentials);
       console.log('Login successful:', data);
 
-      // Store token and user data in AsyncStoragee
+      // Store token and user data in AsyncStorage
       if (data.token) {
         await storeAuthToken(data.token);
       }
@@ -58,24 +44,8 @@ export const loginUser = createAsyncThunk(
 
       return data;
     } catch (error) {
-      
-      console.log(' Login network error:', error);
-      console.log(' Error name:', error.name);
-      console.log(' Error message:', error.message);
-      console.log(' Error stack:', error.stack);
-      
-      if (error.message.includes('Network request failed')) {
-        console.log(' Network request failed - checking connectivity...');
-        
-        try {
-          const testResponse = await fetch('https://httpbin.org/get');
-          console.log(' Test request successful:', testResponse.status);
-        } catch (testError) {
-          console.log(' Test request failed:', testError.message);
-        }
-      }
-      
-      return rejectWithValue(error.message || 'Network request failed');
+      console.log('Login error:', error);
+      return rejectWithValue(error.message || 'Login failed');
     }
   }
 );
@@ -84,40 +54,15 @@ export const signupUser = createAsyncThunk(
   'auth/signupUser',
   async (userData, { rejectWithValue }) => {
     try {
-      console.log(' Signup thunk called with:', userData);
+      console.log('Signup started with:', userData.email);
       
-      const signupPayload = {
-        email: userData.email,
-        password: userData.password
-      };
-
-      console.log(' Sending payload:', signupPayload);
-      console.log(' API URL:', buildUrl(API_CONFIG.ENDPOINTS.SIGNUP));
-
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.SIGNUP), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(signupPayload),
-      });
-
-      console.log('Response status:', response.status);
-      const data = await response.json();
-      console.log('Response data:', data);
-
+      const data = await signUp(userData);
+      console.log('Signup successful:', data);
       
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        console.log(' API error:', data);
-        const errorMessage = data.message || data.error || 'Signup failed';
-        return rejectWithValue(errorMessage);
-      }
-
-      console.log(' Signup successful:', data);
       return data;
     } catch (error) {
-      console.log(' Network error:', error);
-      return rejectWithValue(error.message);
+      console.log('Signup error:', error);
+      return rejectWithValue(error.message || 'Signup failed');
     }
   }
 );
@@ -126,26 +71,10 @@ export const verifyOTP = createAsyncThunk(
   'auth/verifyOTP',
   async (otpData, { rejectWithValue }) => {
     try {
+      console.log('OTP verification started');
       
-      const otpPayload = {
-        otp: otpData.otp
-      };
-
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.VERIFY_OTP), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(otpPayload),
-      });
-
-      const data = await response.json();
-
-      
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        const errorMessage = data.message || data.error || 'OTP verification failed';
-        return rejectWithValue(errorMessage);
-      }
+      const data = await verifyOTPApi(otpData);
+      console.log('OTP verification successful:', data);
 
       // Persist token and user data in AsyncStorage
       if (data.token) {
@@ -154,11 +83,11 @@ export const verifyOTP = createAsyncThunk(
       if (data.user) {
         await storeUserData(data.user);
       }
-      
 
       return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.log('OTP verification error:', error);
+      return rejectWithValue(error.message || 'OTP verification failed');
     }
   }
 );
@@ -167,26 +96,16 @@ export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
   async (emailData, { rejectWithValue }) => {
     try {
+      console.log('Forgot password started');
       
       const email = typeof emailData === 'string' ? emailData : emailData.email;
+      const data = await forgotPasswordApi(email);
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.FORGOT_PASSWORD), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Password reset failed');
-      }
-
+      console.log('Forgot password successful');
       return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.log('Forgot password error:', error);
+      return rejectWithValue(error.message || 'Password reset failed');
     }
   }
 );
@@ -195,29 +114,20 @@ export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
   async ({ token, password, newPassword, confirmNewPassword }, { rejectWithValue }) => {
     try {
+      console.log('Reset password started');
       
-      const body = {
+      const passwordData = {
         newPassword: newPassword || password,
         confirmNewPassword: confirmNewPassword || password,
       };
 
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.RESET_PASSWORD, { token }), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Password reset failed');
-      }
+      const data = await resetPasswordApi(token, passwordData);
+      console.log('Reset password response:', data);
 
       return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Reset password error:', error);
+      return rejectWithValue(error.message || 'Password reset failed');
     }
   }
 );
@@ -226,26 +136,15 @@ export const changePassword = createAsyncThunk(
   'auth/changePassword',
   async (passwordData, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Change password started');
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.CHANGE_PASSWORD), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(passwordData),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to change password');
-      }
+      const data = await changePasswordApi(passwordData);
+      console.log('Change password response:', data);
 
       return data;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Change password error:', error);
+      return rejectWithValue(error.message || 'Failed to change password');
     }
   }
 );
@@ -254,16 +153,14 @@ export const googleLogin = createAsyncThunk(
   'auth/googleLogin',
   async (_, { rejectWithValue }) => {
     try {
-      
-      //implement later
-      const googleLoginUrl = buildUrl(API_CONFIG.ENDPOINTS.GOOGLE_LOGIN);
-      
-      //implement later
+      console.log('Google login started');
       
       // For now, we'll return a placeholder
+      // TODO: Implement Google OAuth when ready
       return { message: 'Google login initiated' };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Google login error:', error);
+      return rejectWithValue(error.message || 'Google login failed');
     }
   }
 );
@@ -283,11 +180,11 @@ export const googleCalendarAuth = createAsyncThunk(
 );
 
 export const verifyToken = createAsyncThunk(
+  'auth/verifyToken',
   async (_, { getState, rejectWithValue }) => {
     try {
       let { token, user } = getState().auth;
 
-      
       if (!token) {
         token = await getAuthToken();
         if (!token) {
@@ -295,29 +192,15 @@ export const verifyToken = createAsyncThunk(
         }
       }
 
+      const data = await verifyTokenApi();
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.VERIFY_TOKEN), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      
-      if (!response.ok) {
-        await removeAuthToken();
-        await removeUserData();
-        return rejectWithValue('Token verification failed');
-      }
-
-      //use existing user from storage/state
+      // Use existing user from storage/state
       const storedUser = user || (await getUserData());
       return { status: 'success', user: storedUser };
     } catch (error) {
       await removeAuthToken();
       await removeUserData();
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Token verification failed');
     }
   }
 );
@@ -326,29 +209,15 @@ export const resendOTP = createAsyncThunk(
   'auth/resendOTP',
   async (email, { rejectWithValue }) => {
     try {
-      console.log(' Resend OTP called for:', email);
+      console.log('Resend OTP called for:', email);
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.RESEND_OTP), {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email }),
-      });
-
-      const data = await response.json();
-      console.log(' Resend OTP response:', data);
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        const errorMessage = data.message || data.error || 'Failed to resend OTP';
-        return rejectWithValue(errorMessage);
-      }
-
-      console.log(' OTP resent successfully');
+      const data = await resendOTPApi(email);
+      console.log('OTP resent successfully');
+      
       return data;
     } catch (error) {
-      console.log(' Resend OTP error:', error);
-      return rejectWithValue(error.message);
+      console.log('Resend OTP error:', error);
+      return rejectWithValue(error.message || 'Failed to resend OTP');
     }
   }
 );
@@ -394,7 +263,7 @@ export const loadStoredAuth = createAsyncThunk(
       const userData = await getUserData();
       const countryData = await getCountryData();
       
-      console.log('📱 Loading stored auth data:', {
+      console.log('Loading stored auth data:', {
         hasToken: !!token,
         hasUserData: !!userData,
         hasCountryData: !!countryData,
@@ -667,3 +536,5 @@ const authSlice = createSlice({
 
 export const { logout, clearError, setToken, setUser } = authSlice.actions;
 export default authSlice.reducer;
+
+

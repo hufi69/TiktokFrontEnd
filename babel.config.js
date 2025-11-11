@@ -9,5 +9,6 @@ module.exports = {
       safe: false,
       allowUndefined: true,
     }],
+    '@babel/plugin-transform-export-namespace-from',
   ],
 };

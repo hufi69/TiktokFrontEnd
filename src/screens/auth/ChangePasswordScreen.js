@@ -40,9 +40,10 @@ const ChangePasswordScreen = ({ onBack, onSuccess }) => {
     }
 
     try {
-      const result = dispatch(changePassword({
-        currentPassword,
-        newPassword
+      const result = await dispatch(changePassword({
+        oldPassword: currentPassword,
+        newPassword,
+        confirmNewPassword: confirmPassword
       }));
 
       if (changePassword.fulfilled.match(result)) {

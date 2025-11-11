@@ -1,38 +1,34 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
 import { storeUserData } from '../../utils/helpers/storage';
+import { 
+  getUserProfile, 
+  updateUserProfile as updateUserProfileApi, 
+  followUser as followUserApi, 
+  unfollowUser as unfollowUserApi, 
+  getFollowers, 
+  getFollowing, 
+  getFollowersCount as getFollowersCountApi, 
+  getFollowingCount as getFollowingCountApi, 
+  getAllUsers, 
+  getPosts 
+} from '../../services/api';
 
 // Async thunks for API calls
 export const fetchUserProfile = createAsyncThunk(
   'user/fetchUserProfile',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      const url = buildUrl(API_CONFIG.ENDPOINTS.USER_PROFILE, { id: userId });
+      console.log('Fetching user profile:', { userId });
       
-      console.log('Fetching user profile:', { userId, url, hasToken: !!token });
-      
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const data = await getUserProfile(userId);
+      console.log('User profile response:', data);
 
-      const data = await response.json();
-      console.log('User profile response:', { status: response.status, data });
-
-      if (!response.ok) {
-        console.log(' User profile fetch failed:', data);
-        return rejectWithValue(data.message || 'Failed to fetch user profile');
-      }
-
-      console.log(' User profile fetched successfully:', data.data);
+      console.log('User profile fetched successfully:', data.data);
       return data.data;
     } catch (error) {
       console.error('User profile fetch error:', error);
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Failed to fetch user profile');
     }
   }
 );
@@ -42,52 +38,17 @@ export const updateUserProfile = createAsyncThunk(
   'user/updateUserProfile',
   async (profileData, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
       const { countryData } = getState().auth;
       
-      const formData = new FormData();
-      const payload = {};
-      if (profileData.fullName) payload.fullName = profileData.fullName;
-      if (profileData.username) payload.userName = profileData.username;
-      if (profileData.occupation) payload.occupation = profileData.occupation;
-      if (profileData.email) payload.email = profileData.email;
-      if (profileData.dateOfBirth) payload.dateOfBirth = profileData.dateOfBirth;
-      if (countryData?.value) payload.country = countryData.value;
+      const payload = {
+        ...profileData,
+        country: countryData?.value || profileData.country
+      };
 
-      formData.append('data', JSON.stringify(payload));
+      console.log('Updating user profile:', payload);
 
-      Object.entries(payload).forEach(([k, v]) => {
-        if (v !== undefined && v !== null) formData.append(k, String(v));
-      });
-
-    
-      if (profileData && (profileData.avatar || profileData.profileImage)) {
-        const img = profileData.avatar || profileData.profileImage;
-        const uri = img?.uri || img?.path || '';
-        const looksRemote = typeof uri === 'string' && /^https?:\/\//i.test(uri);
-        const looksBase64 = typeof uri === 'string' && /^data:image\//i.test(uri);
-        const shouldUpload = uri && !looksRemote && !looksBase64;
-
-        if (shouldUpload) {
-          const name = img.fileName || img.name || `profile_${Date.now()}.jpg`;
-          const type = img.type || 'image/jpeg';
-          formData.append('profilePicture', { uri, type, name });
-        }
-      }
-
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.UPDATE_ME), {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || data.error || 'Failed to update profile');
-      }
+      const data = await updateUserProfileApi(payload);
+      console.log('Update user profile response:', data);
 
       // Store updated user data in AsyncStorage
       const updated = data.user || data.data || data.data?.user || data;
@@ -97,7 +58,8 @@ export const updateUserProfile = createAsyncThunk(
 
       return updated;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Update user profile error:', error);
+      return rejectWithValue(error.message || 'Failed to update profile');
     }
   }
 );
@@ -106,39 +68,16 @@ export const followUser = createAsyncThunk(
   'user/followUser',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      const url = buildUrl(API_CONFIG.ENDPOINTS.FOLLOW_USER);
-      console.log(' Follow user :', url);
-      console.log(' Follow user token:', token ? 'Token exists' : 'No token');
+      console.log('Follow user started for ID:', userId);
       
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId }),
-      });
+      const data = await followUserApi(userId);
+      console.log('Follow user response:', data);
 
-      const data = await response.json();
-      console.log(' Follow user response:', { status: response.status, data });
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        
-        const msg = (data && (data.message || data.error || '')) || '';
-        if (String(data?.code) === '11000' || /duplicate/i.test(msg) || /already/i.test(msg)) {
-          console.log(' Already following; treating as success');
-          return { userId, isFollowing: true };
-        }
-        console.log('Follow user failed:', data);
-        return rejectWithValue(data.message || 'Failed to follow user');
-      }
-
-      console.log(' Follow user successful');
+      console.log('Follow user successful');
       return { userId, isFollowing: true };
     } catch (error) {
       console.error('Follow user error:', error);
-      return rejectWithValue(error.message);
+      return rejectWithValue(error.message || 'Failed to follow user');
     }
   }
 );
@@ -147,32 +86,15 @@ export const unfollowUser = createAsyncThunk(
   'user/unfollowUser',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Unfollow user started for ID:', userId);
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.UNFOLLOW_USER), {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ userId }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        // If already unfollowed success 
-        const msg = (data && (data.message || data.error || '')) || '';
-        if (/not\s*found/i.test(msg) || /not\s*following/i.test(msg)) {
-          console.log(' Already unfollowed; treating as success');
-          return { userId, isFollowing: false };
-        }
-        return rejectWithValue(data.message || 'Failed to unfollow user');
-      }
+      const data = await unfollowUserApi(userId);
+      console.log('Unfollow user response:', data);
 
       return { userId, isFollowing: false };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Unfollow user error:', error);
+      return rejectWithValue(error.message || 'Failed to unfollow user');
     }
   }
 );
@@ -181,41 +103,22 @@ export const fetchUserFollowers = createAsyncThunk(
   'user/fetchUserFollowers',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Fetch user followers started for ID:', userId);
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.ALL_FOLLOWERS), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const data = await getFollowers();
+      console.log('Fetch followers response:', data);
 
-      const data = await response.json();
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        return rejectWithValue(data.message || 'Failed to fetch followers');
-      }
-
-      // fecthing users
+      // Fetching users
       const raw = data.followers || data.data || [];
       const simplified = await Promise.all(
         raw.map(async (f) => {
           const uid = f?.follower?._id || f?.follower || f?._id;
           if (!uid) return null;
           try {
-            const res = await fetch(buildUrl(API_CONFIG.ENDPOINTS.USER_PROFILE, { id: uid }), {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            });
-            const json = await res.json();
-            const user = json?.data || json?.user || json;
+            const userData = await getUserProfile(uid);
+            const user = userData?.data || userData?.user || userData;
             return user;
           } catch (_e) {
-            
             return f?.follower || f;
           }
         })
@@ -223,7 +126,8 @@ export const fetchUserFollowers = createAsyncThunk(
       const followers = simplified.filter(Boolean);
       return { userId, followers };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Fetch followers error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch followers');
     }
   }
 );
@@ -232,21 +136,10 @@ export const fetchUserFollowing = createAsyncThunk(
   'user/fetchUserFollowing',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Fetch user following started for ID:', userId);
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.ALL_FOLLOWING), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        return rejectWithValue(data.message || 'Failed to fetch following');
-      }
+      const data = await getFollowing();
+      console.log('Fetch following response:', data);
 
       // Normalize to user profiles with occupation by fetching each user
       const raw = data.following || data.data || [];
@@ -255,15 +148,8 @@ export const fetchUserFollowing = createAsyncThunk(
           const uid = f?.following?._id || f?.following || f?._id;
           if (!uid) return null;
           try {
-            const res = await fetch(buildUrl(API_CONFIG.ENDPOINTS.USER_PROFILE, { id: uid }), {
-              method: 'GET',
-              headers: {
-                'Authorization': `Bearer ${token}`,
-                'Content-Type': 'application/json',
-              },
-            });
-            const json = await res.json();
-            const user = json?.data || json?.user || json;
+            const userData = await getUserProfile(uid);
+            const user = userData?.data || userData?.user || userData;
             return user;
           } catch (_e) {
             return f?.following || f;
@@ -273,7 +159,8 @@ export const fetchUserFollowing = createAsyncThunk(
       const following = simplified.filter(Boolean);
       return { userId, following };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Fetch following error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch following');
     }
   }
 );
@@ -316,24 +203,15 @@ export const getFollowersCount = createAsyncThunk(
   'user/getFollowersCount',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.FOLLOWERS_COUNT), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        return rejectWithValue(data.message || 'Failed to fetch followers count');
-      }
+      console.log('Get followers count started for ID:', userId);
+      
+      const data = await getFollowersCountApi();
+      console.log('Get followers count response:', data);
 
       return { userId, count: data.followersCount ?? data.data?.followersCount ?? 0 };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Get followers count error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch followers count');
     }
   }
 );
@@ -342,24 +220,15 @@ export const getFollowingCount = createAsyncThunk(
   'user/getFollowingCount',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.FOLLOWING_COUNT), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        return rejectWithValue(data.message || 'Failed to fetch following count');
-      }
+      console.log('Get following count started for ID:', userId);
+      
+      const data = await getFollowingCountApi();
+      console.log('Get following count response:', data);
 
       return { userId, count: data.followingCount ?? data.data?.followingCount ?? 0 };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Get following count error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch following count');
     }
   }
 );
@@ -368,26 +237,16 @@ export const fetchUserPosts = createAsyncThunk(
   'user/fetchUserPosts',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Fetch user posts started for ID:', userId);
       
       // Fetch posts by author (user)
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.POSTS) + `?author=${encodeURIComponent(userId)}`, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to fetch user posts');
-      }
+      const data = await getPosts(50);
+      console.log('Fetch user posts response:', data);
 
       return { userId, posts: data.data?.posts || [] };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Fetch user posts error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch user posts');
     }
   }
 );
@@ -418,30 +277,16 @@ export const fetchAllUsers = createAsyncThunk(
   'user/fetchAllUsers',
   async (_, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      console.log('🔧 Fetching all users with token:', token ? 'Token exists' : 'No token');
+      console.log('Fetching all users');
       
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.ALL_USERS), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      const data = await getAllUsers();
+      console.log('Fetch users response:', data);
 
-      const data = await response.json();
-      console.log(' Fetch users response:', { status: response.status, data });
-
-      if (!response.ok || (data.status && data.status !== 'success')) {
-        console.log(' Fetch users failed:', data);
-        return rejectWithValue(data.message || 'Failed to fetch users');
-      }
-
-      console.log(' Fetch users successful:', data.data);
+      console.log('Fetch users successful:', data.data);
       return data.data || [];
     } catch (error) {
-      console.error(' Fetch users error:', error);
-      return rejectWithValue(error.message);
+      console.error('Fetch users error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch users');
     }
   }
 );

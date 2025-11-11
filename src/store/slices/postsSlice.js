@@ -2,32 +2,16 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
 import { transformPost } from '../../utils/api/postUtils';
 import { initializePosts, getPostLikes } from './likesSlice';
+import { getPosts, createPost as createPostApi, getPost as getPostApi, updatePost as updatePostApi, deletePost as deletePostApi, createComment } from '../../services/api';
 //api calls asycn thunks
 const fetchPosts = createAsyncThunk(
   'posts/fetchPosts',
   async (_, { getState, rejectWithValue, dispatch }) => {
     try {
-      const { token } = getState().auth;
-      console.log(' Fetch posts - Token exists:', !!token);
+      console.log('Fetch posts started');
       
-      const url = buildUrl(API_CONFIG.ENDPOINTS.POSTS) + '?limit=50';
-      console.log(' Fetch posts - API URL:', url);
-      const response = await fetch(url, {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Fetch posts response status:', response.status);
-      const data = await response.json();
-      console.log(' Fetch posts response data:', data);
-
-      if (!response.ok) {
-        console.error('Fetch posts API error:', data);
-        return rejectWithValue(data.message || 'Failed to fetch posts');
-      }
+      const data = await getPosts(50);
+      console.log('Fetch posts response data:', data);
 
       const rawPosts = data.data?.posts || data.posts || [];
       const { user } = getState().auth;
@@ -116,51 +100,22 @@ const createPost = createAsyncThunk(
   'posts/createPost',
   async (postData, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      const formData = new FormData();
-      const payload = {
-        content: postData.caption || postData.content || '',
-        isPublic: postData.isPublic ?? true,
-        tags: postData.tags || [],
-      };
-      formData.append('data', JSON.stringify(payload));
+      console.log('Create post started');
       
-      // Add images to form data
-      if (postData.images && postData.images.length > 0) {
-        postData.images.forEach((image, index) => {
-          formData.append('images', {
-            uri: image.uri,
-            type: image.type || 'image/jpeg',
-            name: `image_${index}.jpg`,
-          });
-        });
-      }
-
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.POST_CREATE), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          
-        },
-        body: formData,
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to create post');
-      }
+      const data = await createPostApi(postData);
+      console.log('Create post response data:', data);
 
       const rawPost = data.data?.post || data.post;
-      console.log(' Raw created post:', rawPost);
+      console.log('Raw created post:', rawPost);
       
       const { user } = getState().auth;
       const transformedPost = transformPost(rawPost, user?._id);
       
-      console.log(' Transformed created post:', transformedPost);
+      console.log('Transformed created post:', transformedPost);
       return transformedPost;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.log('Create post error:', error);
+      return rejectWithValue(error.message || 'Failed to create post');
     }
   }
 );
@@ -169,13 +124,10 @@ const addComment = createAsyncThunk(
   'posts/addComment',
   async ({ postId, content, parentId }, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-
       console.log('Adding comment:', { postId, content, parentId, isReply: !!parentId });
 
       const isReply = !!parentId;
 
-      
       if (isReply) {
         if (!parentId || !content) {
           return rejectWithValue('Parent comment ID and content are required for replies');
@@ -186,42 +138,24 @@ const addComment = createAsyncThunk(
         }
       }
 
-      const url = isReply
-        ? buildUrl(API_CONFIG.ENDPOINTS.REPLY_COMMENT)
-        : buildUrl(API_CONFIG.ENDPOINTS.CREATE_COMMENT);
-
-      const body = isReply
+      const commentData = isReply
         ? { commentId: parentId, content: content?.toString() || '' }
         : { postId, content: content?.toString() || '' };
 
-      console.log(' API Request:', { url, body, isReply });
+      console.log('API Request:', { commentData, isReply });
 
-      const response = await fetch(url, {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(body),
-      });
-
-      const data = await response.json();
-      console.log(' Comment API response:', { status: response.status, data });
-
-      if (!response.ok) {
-        console.error(' Comment API error:', data);
-        return rejectWithValue(data.message || 'Failed to add comment');
-      }
+      const data = await createComment(commentData);
+      console.log('Comment API response:', data);
 
       // Extract comment from response based on API structure
       const comment = data.data?.comment || data.data?.newComment || data.comment || data.newComment;
 
       if (!comment) {
-        console.error(' No comment data in response:', data);
+        console.error('No comment data in response:', data);
         return rejectWithValue('No comment data received from server');
       }
 
-      console.log(' Comment created successfully:', comment);
+      console.log('Comment created successfully:', comment);
 
       return {
         postId,
@@ -230,8 +164,8 @@ const addComment = createAsyncThunk(
         isReply
       };
     } catch (error) {
-      console.error(' Comment network error:', error);
-      return rejectWithValue(error.message);
+      console.error('Comment network error:', error);
+      return rejectWithValue(error.message || 'Failed to add comment');
     }
   }
 );
@@ -240,30 +174,21 @@ const getPost = createAsyncThunk(
   'posts/getPost',
   async (postId, { getState, rejectWithValue, dispatch }) => {
     try {
-      const { token } = getState().auth;
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.GET_POST, { id: postId }), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
+      console.log('Get post started for ID:', postId);
+      
+      const data = await getPostApi(postId);
+      console.log('Get post response data:', data);
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to fetch post');
-      }
       const rawPost = data.data?.post || data.post || data.data;
       const likedByMe = data.data?.likedByMe;
       const { user } = getState().auth;
       const transformed = transformPost(rawPost, user?._id);
+      
       // Use likedByMe from API 
       if (typeof likedByMe === 'boolean') {
         transformed.isLiked = likedByMe;
       }
 
-      
       try {
         dispatch(initializePosts([transformed]));
         if (transformed.isLiked && !transformed.likeId) {
@@ -273,7 +198,8 @@ const getPost = createAsyncThunk(
 
       return transformed;
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.log('Get post error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch post');
     }
   }
 );
@@ -282,61 +208,25 @@ const updatePostAsync = createAsyncThunk(
   'posts/updatePostAsync',
   async ({ postId, postData }, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Update post started for ID:', postId);
+      console.log('Update post data:', postData);
       
-      const url = buildUrl(API_CONFIG.ENDPOINTS.UPDATE_POST, { id: postId });
-      console.log(' Update post URL:', url);
-      console.log(' Update post token:', token ? 'Token exists' : 'No token');
-      console.log(' Update post data:', postData);
-// fix this later right now not using form data
-      const response = await fetch(url, {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          content: postData.content || '',
-          // Skip images right now
-        }),
+      const data = await updatePostApi(postId, {
+        content: postData.content || '',
+        // Skip images for now
       });
+      console.log('Update post response data:', data);
 
-      console.log(' Update post response status:', response.status);
-      
-      if (!response.ok) {
-        
-        let errorMessage = 'Failed to update post';
-        try {
-          const errorData = await response.json();
-          console.error(' Update post API error data:', errorData);
-          errorMessage = errorData.message || errorData.error || errorMessage;
-        } catch (parseError) {
-          console.error(' Failed to parse error response:', parseError);
-          errorMessage = `Server error: ${response.status}`;
-        }
-        return rejectWithValue(errorMessage);
-      }
-
-      const data = await response.json();
-      console.log(' Update post response data:', data);
-
-      console.log('Update post API response:', data);
       const rawPost = data.data?.post || data.data || data;
-      console.log(' Raw updated post:', rawPost);
+      console.log('Raw updated post:', rawPost);
       
       const { user } = getState().auth;
       const transformedPost = transformPost(rawPost, user?._id);
       
-      console.log(' Transformed updated post:', transformedPost);
+      console.log('Transformed updated post:', transformedPost);
       return { postId, post: transformedPost };
     } catch (error) {
       console.error('Update post network error:', error);
-      console.error(' Error details:', {
-        name: error.name,
-        message: error.message,
-        stack: error.stack
-      });
-      
       return rejectWithValue(error.message || 'Failed to update post');
     }
   }
@@ -346,43 +236,15 @@ const deletePost = createAsyncThunk(
   'posts/deletePost',
   async (postId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.DELETE_POST, { id: postId }), {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      console.log('Delete response status:', response.status);
+      console.log('Delete post started for ID:', postId);
       
-      // Check if response has content
-      const responseText = await response.text();
-      console.log(' Delete response text:', responseText);
-      
-      let data;
-      try {
-        data = responseText ? JSON.parse(responseText) : {};
-      } catch (parseError) {
-        console.error(' JSON parse error:', parseError);
-        // If response is empty or not JSON, but status is 200/204 consider it success
-        if (response.ok) {
-          return postId;
-        }
-        return rejectWithValue('Invalid response from server');
-      }
-
-      if (!response.ok) {
-        console.error(' Delete post API error:', data);
-        const errorMessage = data.message || data.error || 'Failed to delete post';
-        return rejectWithValue(errorMessage);
-      }
+      await deletePostApi(postId);
+      console.log('Delete post successful for ID:', postId);
 
       return postId;
     } catch (error) {
-      console.error(' Delete network error:', error);
-      return rejectWithValue(error.message);
+      console.error('Delete post error:', error);
+      return rejectWithValue(error.message || 'Failed to delete post');
     }
   }
 );

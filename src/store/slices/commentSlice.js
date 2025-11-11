@@ -1,30 +1,28 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
+import { 
+  getComments, 
+  createComment as createCommentApi, 
+  deleteComment as deleteCommentApi, 
+  updateComment as updateCommentApi, 
+  replyComment, 
+  getReplies 
+} from '../../services/api';
 
 // Get all comments for a post
 export const getPostComments = createAsyncThunk(
   'comments/getPostComments',
   async (postId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Get post comments started for ID:', postId);
       
-      const response = await fetch(buildUrl(`/api/v1/comments/get-comments/${postId}`), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch comments');
-      }
+      const data = await getComments(postId);
+      console.log('Get comments response:', data);
 
       return { postId, comments: data.data?.comments || [] };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Get comments error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch comments');
     }
   }
 );
@@ -34,25 +32,10 @@ export const createComment = createAsyncThunk(
   'comments/createComment',
   async ({ postId, content }, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Creating parent comment:', { postId, content });
 
-      console.log(' Creating parent comment:', { postId, content });
-
-      const response = await fetch(buildUrl('/api/v1/comments/create-comment'), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ postId, content }),
-      });
-
-      const data = await response.json();
-      console.log('📥Create comment response:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to create comment');
-      }
+      const data = await createCommentApi({ postId, content });
+      console.log('Create comment response:', data);
 
       const comment = data.data?.comment;
       if (!comment) {
@@ -61,7 +44,8 @@ export const createComment = createAsyncThunk(
 
       return { postId, comment, isReply: false };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Create comment error:', error);
+      return rejectWithValue(error.message || 'Failed to create comment');
     }
   }
 );
@@ -71,26 +55,15 @@ export const deleteComment = createAsyncThunk(
   'comments/deleteComment',
   async ({ commentId, postId }, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Delete comment started for ID:', commentId);
       
-      const response = await fetch(buildUrl('/api/v1/comments/delete-comment'), {
-        method: 'DELETE',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ commentId }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to delete comment');
-      }
+      await deleteCommentApi(commentId);
+      console.log('Delete comment successful for ID:', commentId);
 
       return { commentId, postId };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Delete comment error:', error);
+      return rejectWithValue(error.message || 'Failed to delete comment');
     }
   }
 );
@@ -100,26 +73,15 @@ export const updateComment = createAsyncThunk(
   'comments/updateComment',
   async ({ commentId, content }, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Update comment started for ID:', commentId);
       
-      const response = await fetch(buildUrl('/api/v1/comments/update-comment'), {
-        method: 'PATCH',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ commentId, content }),
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to update comment');
-      }
+      const data = await updateCommentApi({ commentId, content });
+      console.log('Update comment response:', data);
 
       return { comment: data.data?.comment };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Update comment error:', error);
+      return rejectWithValue(error.message || 'Failed to update comment');
     }
   }
 );
@@ -129,25 +91,10 @@ export const replyToComment = createAsyncThunk(
   'comments/replyToComment',
   async ({ commentId, content, postId }, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Creating reply:', { commentId, content, postId });
 
-      console.log(' Creating reply:', { commentId, content, postId });
-
-      const response = await fetch(buildUrl('/api/v1/comments/reply-comment'), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ commentId, content }),
-      });
-
-      const data = await response.json();
-      console.log(' Reply response:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to reply to comment');
-      }
+      const data = await replyComment({ commentId, content });
+      console.log('Reply response:', data);
 
       const reply = data.data?.newComment;
       if (!reply) {
@@ -161,7 +108,8 @@ export const replyToComment = createAsyncThunk(
         isReply: true
       };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Reply to comment error:', error);
+      return rejectWithValue(error.message || 'Failed to reply to comment');
     }
   }
 );
@@ -171,25 +119,15 @@ export const getCommentReplies = createAsyncThunk(
   'comments/getCommentReplies',
   async (commentId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Get comment replies started for ID:', commentId);
       
-      const response = await fetch(buildUrl(`/api/v1/comments/get-replies/${commentId}`), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch replies');
-      }
+      const data = await getReplies(commentId);
+      console.log('Get replies response:', data);
 
       return { commentId, replies: data.data?.replies || [] };
     } catch (error) {
-      return rejectWithValue(error.message);
+      console.error('Get comment replies error:', error);
+      return rejectWithValue(error.message || 'Failed to fetch replies');
     }
   }
 );

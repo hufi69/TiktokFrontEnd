@@ -13,6 +13,7 @@
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@reduxjs/toolkit": "^2.8.2",
     "@shopify/flash-list": "^2.0.3",
+    "axios": "^1.13.2",
     "react": "19.1.0",
     "react-native": "0.81.1",
     "react-native-dotenv": "^3.4.11",
@@ -25,6 +26,7 @@
   },
   "devDependencies": {
     "@babel/core": "^7.25.2",
+    "@babel/plugin-transform-export-namespace-from": "^7.27.1",
     "@babel/preset-env": "^7.25.3",
     "@babel/runtime": "^7.25.0",
     "@react-native-community/cli": "^20.0.0",

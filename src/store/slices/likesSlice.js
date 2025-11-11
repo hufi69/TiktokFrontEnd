@@ -1,5 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
+import { likePost, unlikePost, getPostLikes as getPostLikesApi, likeComment, unlikeComment } from '../../services/api';
 
 const initialState = {
   posts: {},          
@@ -14,9 +15,6 @@ export const togglePostLike = createAsyncThunk(
   async (payload, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const { token } = state.auth;
-
-      
       const postId = typeof payload === 'string' ? payload : payload.postId;
 
       const currentLike = state.likes.posts[postId];
@@ -24,32 +22,19 @@ export const togglePostLike = createAsyncThunk(
       const isCurrentlyLiked = currentLike?.isLiked || false;
       const storedLikeId = currentLike?.likeId;
 
-      console.log(' Toggling post like:', { postId, isCurrentlyLiked, currentCount });
-      console.log(' Decision logic: isCurrentlyLiked =', isCurrentlyLiked, ', so will', isCurrentlyLiked ? 'UNLIKE' : 'LIKE');
+      console.log('Toggling post like:', { postId, isCurrentlyLiked, currentCount });
+      console.log('Decision logic: isCurrentlyLiked =', isCurrentlyLiked, ', so will', isCurrentlyLiked ? 'UNLIKE' : 'LIKE');
 
       if (!isCurrentlyLiked) {
-        // LIKE the post - POST /api/v1/likes/like
-        console.log(' Liking post:', postId);
+        // LIKE the post
+        console.log('Liking post:', postId);
 
-        const likeResponse = await fetch(buildUrl('/api/v1/likes/like'), {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ postId }),
-        });
-
-        const likeData = await likeResponse.json();
-        console.log(' Like response:', likeData);
-
-        if (!likeResponse.ok) {
-          throw new Error(likeData.message || 'Failed to like post');
-        }
+        const likeData = await likePost(postId);
+        console.log('Like response:', likeData);
 
         // Store the likeId 
         const newLikeId = likeData.data?.like?._id;
-        console.log(' Like successful, stored likeId:', newLikeId);
+        console.log('Like successful, stored likeId:', newLikeId);
 
         return {
           postId,
@@ -59,29 +44,17 @@ export const togglePostLike = createAsyncThunk(
         };
 
       } else {
-        // UNLIKE the post - DELETE /api/v1/likes/unlike
+        // UNLIKE the post
         console.log('Unliking post:', postId);
 
         let likeIdToUse = storedLikeId;
 
         // If no likeId stored but post is liked, fetch it from backend
         if (!likeIdToUse) {
-          console.log(' No likeId stored, fetching from backend...');
+          console.log('No likeId stored, fetching from backend...');
 
-          const likesResponse = await fetch(buildUrl(`/api/v1/likes/get-likes/${postId}`), {
-            method: 'GET',
-            headers: {
-              'Authorization': `Bearer ${token}`,
-              'Content-Type': 'application/json',
-            },
-          });
-
-          const likesData = await likesResponse.json();
+          const likesData = await getPostLikesApi(postId);
           console.log('Fetched likes for unlike:', likesData);
-
-          if (!likesResponse.ok) {
-            throw new Error(likesData.message || 'Failed to fetch likes');
-          }
 
           // Find current user's like
           const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
@@ -94,30 +67,17 @@ export const togglePostLike = createAsyncThunk(
 
           if (myLike) {
             likeIdToUse = myLike._id;
-            console.log(' Found likeId for unlike:', likeIdToUse);
+            console.log('Found likeId for unlike:', likeIdToUse);
           } else {
             throw new Error('Could not find your like for this post');
           }
         }
 
         // Now unlike with the likeId
-        const unlikeResponse = await fetch(buildUrl('/api/v1/likes/unlike'), {
-          method: 'DELETE',
-          headers: {
-            'Authorization': `Bearer ${token}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({ likeId: likeIdToUse }),
-        });
-
-        const unlikeData = await unlikeResponse.json();
+        const unlikeData = await unlikePost(postId);
         console.log('Unlike response:', unlikeData);
 
-        if (!unlikeResponse.ok) {
-          throw new Error(unlikeData.message || 'Failed to unlike post');
-        }
-
-        console.log(' Unlike successful');
+        console.log('Unlike successful');
 
         return {
           postId,
@@ -128,7 +88,7 @@ export const togglePostLike = createAsyncThunk(
       }
 
     } catch (error) {
-      console.error(' Post like error:', error);
+      console.error('Post like error:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -140,34 +100,27 @@ export const toggleCommentLike = createAsyncThunk(
   async (commentId, { getState, rejectWithValue }) => {
     try {
       const state = getState();
-      const { token } = state.auth;
       const currentLike = state.likes.comments[commentId];
       const currentCount = currentLike?.count || 0;
       const isCurrentlyLiked = currentLike?.isLiked || false;
 
-      console.log(' Toggling comment like:', { commentId, isCurrentlyLiked, currentCount });
-      console.log(' API URL:', buildUrl(`/api/v1/likes/like-comment/${commentId}`));
+      console.log('Toggling comment like:', { commentId, isCurrentlyLiked, currentCount });
 
-      // Backend endpoint: POST /api/v1/likes/like-comment/:commentId
-      const response = await fetch(buildUrl(`/api/v1/likes/like-comment/${commentId}`), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      console.log('📥 Comment like response:', data);
-
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to toggle comment like');
+      let data;
+      if (!isCurrentlyLiked) {
+        // Like the comment
+        data = await likeComment(commentId);
+        console.log('Comment like response:', data);
+      } else {
+        // Unlike the comment
+        data = await unlikeComment(commentId);
+        console.log('Comment unlike response:', data);
       }
 
       // Check response to determine if liked or unliked
       if (data.message && data.message.includes('unliked')) {
         // Comment was unliked
-        console.log(' Comment unliked');
+        console.log('Comment unliked');
         return {
           commentId,
           isLiked: false,
@@ -176,7 +129,7 @@ export const toggleCommentLike = createAsyncThunk(
         };
       } else if (data.data?.like) {
         // Comment was liked
-        console.log(' Comment liked, likeId:', data.data.like._id);
+        console.log('Comment liked, likeId:', data.data.like._id);
         return {
           commentId,
           isLiked: true,
@@ -188,7 +141,7 @@ export const toggleCommentLike = createAsyncThunk(
       }
 
     } catch (error) {
-      console.error(' Comment like error:', error);
+      console.error('Comment like error:', error);
       return rejectWithValue(error.message);
     }
   }
@@ -199,21 +152,10 @@ export const getPostLikes = createAsyncThunk(
   'likes/getPostLikes',
   async (postId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
+      console.log('Get post likes started for ID:', postId);
 
-      const response = await fetch(buildUrl(`/api/v1/likes/get-likes/${postId}`), {
-        method: 'GET',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'application/json',
-        },
-      });
-
-      const data = await response.json();
-      
-      if (!response.ok) {
-        throw new Error(data.message || 'Failed to fetch post likes');
-      }
+      const data = await getPostLikesApi(postId);
+      console.log('Get post likes response:', data);
 
       const likes = data.data?.likes || [];
       const myUserId = getState().auth?.user?._id || getState().auth?.user?.id;

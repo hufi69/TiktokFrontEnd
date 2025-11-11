@@ -58,6 +58,7 @@ const UserItem = ({ user, onToggleFollow, loading, onUserPress }) => (
 const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { allUsers, isLoading } = useAppSelector(state => state.user);
+  const { user: currentUser } = useAppSelector(state => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
 
   useEffect(() => {
@@ -85,11 +86,24 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
     }
   };
 
-  const filteredUsers = allUsers.filter(user =>
-    (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (user.userName && user.userName.toLowerCase().includes(searchQuery.toLowerCase())) ||
-    (user.occupation && user.occupation.toLowerCase().includes(searchQuery.toLowerCase()))
-  );
+  const filteredUsers = allUsers
+    .filter(user => {
+      // Filter out current user - don't show yourself in follow suggestions
+      if (user._id === currentUser?._id || user._id === currentUser?.id) {
+        return false;
+      }
+
+      // Apply search filter
+      if (searchQuery) {
+        return (
+          (user.fullName && user.fullName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (user.userName && user.userName.toLowerCase().includes(searchQuery.toLowerCase())) ||
+          (user.occupation && user.occupation.toLowerCase().includes(searchQuery.toLowerCase()))
+        );
+      }
+
+      return true;
+    });
 
   const handleUserPress = (user) => {
     console.log(' Navigate to user profile:', user._id);
