@@ -1,8 +1,7 @@
-// configuration
 
-// Environment Settings - Change CURRENT_ENV to switch environments
-// local for Android emulator - this will use 10.0.2.2:8000
-const CURRENT_ENV = 'LOCAL'; // LOCAL | USB_DEBUG | NGROK | PRODUCTION
+
+
+const CURRENT_ENV = 'LOCAL'; 
 
 // Optional .env override for API base URL when running on real devices
 let ENV_API_BASE_URL = undefined;
@@ -13,21 +12,20 @@ try {
   
 }
 
-// For Android emulator, use 10.0.2.2 to access localhost
 const pickLocalBaseUrl = () => {
-  return 'http://10.0.2.2:8000';
+  // For iOS Simulator, use localhost
+  // For real device, use your Mac's IP
+  return 'http://localhost:8000';
 };
 
 const ENVIRONMENTS = {
   LOCAL: { API_BASE_URL: pickLocalBaseUrl(), DEBUG: true },
-  // For running on a physical Android/iOS device connected to same Wi‑Fi as your dev machine.
-  // Set API_BASE_URL in your .env (e.g. API_BASE_URL=http://<YOUR_LAPTOP_IP>:8000)
+ 
   USB_DEBUG: { API_BASE_URL: ENV_API_BASE_URL || 'http://192.168.0.192:8000', DEBUG: true },
   NGROK: { API_BASE_URL: 'https://your-ngrok-url.ngrok-free.app', DEBUG: true },
-   PRODUCTION: { API_BASE_URL: 'https://your-production-api.com', DEBUG: false }
+   PRODUCTION: { API_BASE_URL: 'http://46.101.95.75', DEBUG: true }
 };
 
-// Api Endpoints
 const API_ENDPOINTS = {
   // Auth
   AUTH_SIGNUP: '/api/v1/auth/signup',
@@ -148,7 +146,7 @@ export const CONFIG = {
     UPDATE_COMMENT: API_ENDPOINTS.COMMENT_UPDATE,
     REPLY_COMMENT: API_ENDPOINTS.COMMENT_REPLY,
     COMMENT_REPLIES: API_ENDPOINTS.COMMENT_REPLIES,
-    COMMENT_LIKE: API_ENDPOINTS.COMMENT_LIKE,
+    COMMENT_LIKE: API_ENDPOINTS.COMMENT_LIKE,        
     COMMENT_UNLIKE: API_ENDPOINTS.COMMENT_UNLIKE,
 
     // OAuth

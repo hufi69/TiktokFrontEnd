@@ -1,4 +1,4 @@
-import { getRequest, patchRequest, postFormDataRequest } from './httpClient';
+import { getRequest, patchRequest, postFormDataRequest, patchFormDataRequest } from './httpClient';
 import { CONFIG } from '../../config';
 
 const MODEL_NAME = '/api/v1/users';
@@ -36,7 +36,7 @@ export async function updateUserProfile(userData) {
       });
     }
 
-    const result = await postFormDataRequest(`${MODEL_NAME}/updateMe`, formData);
+    const result = await patchFormDataRequest(`${MODEL_NAME}/updateMe`, formData);
     return result;
   } catch (err) {
     throw err;
