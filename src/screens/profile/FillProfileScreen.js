@@ -15,7 +15,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import BackButton from '../../components/common/BackButton';
-import AuthInput from '../../components/auth/AuthInput';
+import AuthInput from '../AuthScreen/components/AuthInput';
 import { colors } from '../../constants/theme';
 
 const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, onEditCountry }) => {

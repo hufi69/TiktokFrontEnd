@@ -1,18 +1,9 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
 import { storeUserData } from '../../utils/helpers/storage';
-import { 
-  getUserProfile, 
-  updateUserProfile as updateUserProfileApi, 
-  followUser as followUserApi, 
-  unfollowUser as unfollowUserApi, 
-  getFollowers, 
-  getFollowing, 
-  getFollowersCount as getFollowersCountApi, 
-  getFollowingCount as getFollowingCountApi, 
-  getAllUsers, 
-  getPosts 
-} from '../../services/api';
+import * as userApi from '../../services/api/userApi';
+import * as followApi from '../../services/api/followApi';
+import * as postsApi from '../../services/api/postsApi';
 
 // Async thunks for API calls
 export const fetchUserProfile = createAsyncThunk(
@@ -21,7 +12,7 @@ export const fetchUserProfile = createAsyncThunk(
     try {
       console.log('Fetching user profile:', { userId });
       
-      const data = await getUserProfile(userId);
+      const data = await userApi.getUserProfile(userId);
       console.log('User profile response:', data);
 
       console.log('User profile fetched successfully:', data.data);
@@ -47,7 +38,7 @@ export const updateUserProfile = createAsyncThunk(
 
       console.log('Updating user profile:', payload);
 
-      const data = await updateUserProfileApi(payload);
+      const data = await userApi.updateUserProfile(payload);
       console.log('Update user profile response:', data);
 
       // Store updated user data in AsyncStorage
@@ -70,7 +61,7 @@ export const followUser = createAsyncThunk(
     try {
       console.log('Follow user started for ID:', userId);
       
-      const data = await followUserApi(userId);
+      const data = await followApi.followUser(userId);
       console.log('Follow user response:', data);
 
       console.log('Follow user successful');
@@ -88,7 +79,7 @@ export const unfollowUser = createAsyncThunk(
     try {
       console.log('Unfollow user started for ID:', userId);
       
-      const data = await unfollowUserApi(userId);
+      const data = await followApi.unfollowUser(userId);
       console.log('Unfollow user response:', data);
 
       return { userId, isFollowing: false };
@@ -105,7 +96,7 @@ export const fetchUserFollowers = createAsyncThunk(
     try {
       console.log('Fetch user followers started for ID:', userId);
       
-      const data = await getFollowers();
+      const data = await followApi.getFollowers();
       console.log('Fetch followers response:', data);
 
       // Fetching users
@@ -138,7 +129,7 @@ export const fetchUserFollowing = createAsyncThunk(
     try {
       console.log('Fetch user following started for ID:', userId);
       
-      const data = await getFollowing();
+      const data = await followApi.getFollowing();
       console.log('Fetch following response:', data);
 
       // Normalize to user profiles with occupation by fetching each user
@@ -205,7 +196,7 @@ export const getFollowersCount = createAsyncThunk(
     try {
       console.log('Get followers count started for ID:', userId);
       
-      const data = await getFollowersCountApi();
+      const data = await followApi.getFollowersCount();
       console.log('Get followers count response:', data);
 
       return { userId, count: data.followersCount ?? data.data?.followersCount ?? 0 };
@@ -222,7 +213,7 @@ export const getFollowingCount = createAsyncThunk(
     try {
       console.log('Get following count started for ID:', userId);
       
-      const data = await getFollowingCountApi();
+      const data = await followApi.getFollowingCount();
       console.log('Get following count response:', data);
 
       return { userId, count: data.followingCount ?? data.data?.followingCount ?? 0 };
@@ -240,7 +231,7 @@ export const fetchUserPosts = createAsyncThunk(
       console.log('Fetch user posts started for ID:', userId);
       
       // Fetch posts by author (user)
-      const data = await getPosts(50);
+      const data = await postsApi.getPosts(50);
       console.log('Fetch user posts response:', data);
 
       return { userId, posts: data.data?.posts || [] };
@@ -279,7 +270,7 @@ export const fetchAllUsers = createAsyncThunk(
     try {
       console.log('Fetching all users');
       
-      const data = await getAllUsers();
+      const data = await userApi.getAllUsers();
       console.log('Fetch users response:', data);
 
       console.log('Fetch users successful:', data.data);

@@ -71,7 +71,8 @@ export async function deletePost(postId) {
 
 export async function likePost(postId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.POST_LIKE.replace(':id', postId)}`);
+   
+    const result = await postRequest(`/api/v1/likes/like`, { postId });
     return result;
   } catch (err) {
     throw err;

@@ -1,20 +1,22 @@
-import { getRequest, patchRequest } from './httpClient';
+import { getRequest, postRequest, deleteRequest } from './httpClient';
 import { CONFIG } from '../../config';
 
 const MODEL_NAME = '/api/v1/likes';
 
 export async function likePost(postId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.LIKE_POST_ACTION}`, { postId });
+    // Backend: POST /api/v1/likes/like with { postId }
+    const result = await postRequest(`${MODEL_NAME}/like`, { postId });
     return result;
   } catch (err) {
     throw err;
   }
 }
 
-export async function unlikePost(postId) {
+export async function unlikePost(likeId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.UNLIKE_POST_ACTION}`, { postId });
+    // Backend: DELETE /api/v1/likes/unlike with { likeId }
+    const result = await deleteRequest(`${MODEL_NAME}/unlike`, { data: { likeId } });
     return result;
   } catch (err) {
     throw err;
@@ -23,7 +25,8 @@ export async function unlikePost(postId) {
 
 export async function getPostLikes(postId) {
   try {
-    const result = await getRequest(`${CONFIG.ENDPOINTS.GET_POST_LIKES}?postId=${postId}`);
+    // Backend: GET /api/v1/likes/get-likes/:postId
+    const result = await getRequest(`${MODEL_NAME}/get-likes/${postId}`);
     return result;
   } catch (err) {
     throw err;
@@ -41,7 +44,8 @@ export async function getUserLikes(userId) {
 
 export async function likeComment(commentId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.COMMENT_LIKE}`, { commentId });
+    // Backend: POST /api/v1/likes/like-comment/:postId (commentId in URL)
+    const result = await postRequest(`${MODEL_NAME}/like-comment/${commentId}`, {});
     return result;
   } catch (err) {
     throw err;
@@ -50,7 +54,8 @@ export async function likeComment(commentId) {
 
 export async function unlikeComment(commentId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.COMMENT_UNLIKE}`, { commentId });
+    // Backend: Same endpoint toggles like/unlike
+    const result = await postRequest(`${MODEL_NAME}/like-comment/${commentId}`, {});
     return result;
   } catch (err) {
     throw err;

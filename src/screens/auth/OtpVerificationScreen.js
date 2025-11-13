@@ -24,15 +24,11 @@ const OtpVerificationScreen = ({ onBack, onVerify, loading, error, email }) => {
 
     setResendLoading(true);
     try {
-      const result =  dispatch(resendOTP({ email }));
-      if (resendOTP.fulfilled.match(result)) {
-        Alert.alert('Success', 'OTP resent successfully!');
-      } else {
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to resend OTP';
-        Alert.alert('Error', errorMessage);
-      }
+      const result = await dispatch(resendOTP(email)).unwrap();
+      Alert.alert('Success', 'OTP resent successfully!');
     } catch (error) {
-      Alert.alert('Error', error.message);
+      const errorMessage = error?.message || error || 'Failed to resend OTP';
+      Alert.alert('Error', errorMessage);
     } finally {
       setResendLoading(false);
     }

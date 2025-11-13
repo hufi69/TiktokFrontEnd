@@ -69,7 +69,8 @@ export async function getComment(commentId) {
 
 export async function likeComment(commentId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.COMMENT_LIKE}`, { commentId });
+    // Backend: POST /api/v1/likes/like-comment/:commentId (toggles)
+    const result = await postRequest(`/api/v1/likes/like-comment/${commentId}`, {});
     return result;
   } catch (err) {
     throw err;
@@ -78,7 +79,8 @@ export async function likeComment(commentId) {
 
 export async function unlikeComment(commentId) {
   try {
-    const result = await patchRequest(`${CONFIG.ENDPOINTS.COMMENT_UNLIKE}`, { commentId });
+    // Backend: POST /api/v1/likes/like-comment/:commentId (toggles)
+    const result = await postRequest(`/api/v1/likes/like-comment/${commentId}`, {});
     return result;
   } catch (err) {
     throw err;

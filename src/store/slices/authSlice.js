@@ -12,27 +12,25 @@ import {
   removeCountryData
 } from '../../utils/helpers/storage';
 import { updateUserProfile } from './userSlice';
-import { 
-  signIn, 
-  signUp, 
-  verifyOTP as verifyOTPApi, 
-  resendOTP as resendOTPApi, 
-  forgotPassword as forgotPasswordApi, 
-  resetPassword as resetPasswordApi, 
-  changePassword as changePasswordApi, 
-  googleLogin as googleLoginApi, 
-  verifyToken as verifyTokenApi 
-} from '../../services/api';
+import * as authApi from '../../services/api/authApi';
 
-// Async thunks for API calls
+
 export const loginUser = createAsyncThunk(
   'auth/loginUser',
   async (credentials, { rejectWithValue }) => {
     try {
-      console.log('Login started with:', credentials.email);
+      console.log('🔐 Login attempt:', {
+        email: credentials.email,
+        passwordLength: credentials.password?.length,
+        hasPassword: !!credentials.password,
+      });
       
-      const data = await signIn(credentials);
-      console.log('Login successful:', data);
+      const data = await authApi.signIn(credentials);
+      console.log('✅ Login successful:', {
+        hasToken: !!data.token,
+        hasUser: !!data.user,
+        userId: data.user?._id,
+      });
 
       // Store token and user data in AsyncStorage
       if (data.token) {
@@ -44,7 +42,10 @@ export const loginUser = createAsyncThunk(
 
       return data;
     } catch (error) {
-      console.log('Login error:', error);
+      console.error('❌ Login failed:', {
+        message: error.message,
+        email: credentials.email,
+      });
       return rejectWithValue(error.message || 'Login failed');
     }
   }
@@ -56,7 +57,7 @@ export const signupUser = createAsyncThunk(
     try {
       console.log('Signup started with:', userData.email);
       
-      const data = await signUp(userData);
+      const data = await authApi.signUp(userData);
       console.log('Signup successful:', data);
       
       return data;
@@ -73,7 +74,7 @@ export const verifyOTP = createAsyncThunk(
     try {
       console.log('OTP verification started');
       
-      const data = await verifyOTPApi(otpData);
+      const data = await authApi.verifyOTP(otpData);
       console.log('OTP verification successful:', data);
 
       // Persist token and user data in AsyncStorage
@@ -99,7 +100,7 @@ export const forgotPassword = createAsyncThunk(
       console.log('Forgot password started');
       
       const email = typeof emailData === 'string' ? emailData : emailData.email;
-      const data = await forgotPasswordApi(email);
+      const data = await authApi.forgotPassword(email);
       
       console.log('Forgot password successful');
       return data;
@@ -121,7 +122,7 @@ export const resetPassword = createAsyncThunk(
         confirmNewPassword: confirmNewPassword || password,
       };
 
-      const data = await resetPasswordApi(token, passwordData);
+      const data = await authApi.resetPassword(token, passwordData);
       console.log('Reset password response:', data);
 
       return data;
@@ -138,7 +139,7 @@ export const changePassword = createAsyncThunk(
     try {
       console.log('Change password started');
       
-      const data = await changePasswordApi(passwordData);
+      const data = await authApi.changePassword(passwordData);
       console.log('Change password response:', data);
 
       return data;
@@ -192,7 +193,7 @@ export const verifyToken = createAsyncThunk(
         }
       }
 
-      const data = await verifyTokenApi();
+      const data = await authApi.verifyToken();
       
       // Use existing user from storage/state
       const storedUser = user || (await getUserData());
@@ -211,7 +212,7 @@ export const resendOTP = createAsyncThunk(
     try {
       console.log('Resend OTP called for:', email);
       
-      const data = await resendOTPApi(email);
+      const data = await authApi.resendOTP(email);
       console.log('OTP resent successfully');
       
       return data;

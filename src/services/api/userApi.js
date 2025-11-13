@@ -26,7 +26,7 @@ export async function updateUserProfile(userData) {
     
     formData.append('data', JSON.stringify(payload));
 
-    // Handle profile picture upload
+    
     const img = userData.avatar || userData.profileImage;
     if (img?.uri) {
       formData.append('profilePicture', {

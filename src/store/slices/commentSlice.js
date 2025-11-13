@@ -1,13 +1,6 @@
 import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
-import { 
-  getComments, 
-  createComment as createCommentApi, 
-  deleteComment as deleteCommentApi, 
-  updateComment as updateCommentApi, 
-  replyComment, 
-  getReplies 
-} from '../../services/api';
+import * as commentsApi from '../../services/api/commentsApi';
 
 // Get all comments for a post
 export const getPostComments = createAsyncThunk(
@@ -16,7 +9,7 @@ export const getPostComments = createAsyncThunk(
     try {
       console.log('Get post comments started for ID:', postId);
       
-      const data = await getComments(postId);
+      const data = await commentsApi.getComments(postId);
       console.log('Get comments response:', data);
 
       return { postId, comments: data.data?.comments || [] };
@@ -34,7 +27,7 @@ export const createComment = createAsyncThunk(
     try {
       console.log('Creating parent comment:', { postId, content });
 
-      const data = await createCommentApi({ postId, content });
+      const data = await commentsApi.createComment({ postId, content });
       console.log('Create comment response:', data);
 
       const comment = data.data?.comment;
@@ -57,7 +50,7 @@ export const deleteComment = createAsyncThunk(
     try {
       console.log('Delete comment started for ID:', commentId);
       
-      await deleteCommentApi(commentId);
+      await commentsApi.deleteComment(commentId);
       console.log('Delete comment successful for ID:', commentId);
 
       return { commentId, postId };
@@ -75,7 +68,7 @@ export const updateComment = createAsyncThunk(
     try {
       console.log('Update comment started for ID:', commentId);
       
-      const data = await updateCommentApi({ commentId, content });
+      const data = await commentsApi.updateComment({ commentId, content });
       console.log('Update comment response:', data);
 
       return { comment: data.data?.comment };
@@ -93,7 +86,7 @@ export const replyToComment = createAsyncThunk(
     try {
       console.log('Creating reply:', { commentId, content, postId });
 
-      const data = await replyComment({ commentId, content });
+      const data = await commentsApi.replyComment({ commentId, content });
       console.log('Reply response:', data);
 
       const reply = data.data?.newComment;
@@ -121,7 +114,7 @@ export const getCommentReplies = createAsyncThunk(
     try {
       console.log('Get comment replies started for ID:', commentId);
       
-      const data = await getReplies(commentId);
+      const data = await commentsApi.getReplies(commentId);
       console.log('Get replies response:', data);
 
       return { commentId, replies: data.data?.replies || [] };

@@ -1,6 +1,6 @@
-import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
+import { createSlice, createAsyncThunk, createSelector } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
-import { likePost, unlikePost, getPostLikes as getPostLikesApi, likeComment, unlikeComment } from '../../services/api';
+import * as likesApi from '../../services/api/likesApi';
 
 const initialState = {
   posts: {},          
@@ -22,68 +22,44 @@ export const togglePostLike = createAsyncThunk(
       const isCurrentlyLiked = currentLike?.isLiked || false;
       const storedLikeId = currentLike?.likeId;
 
-      console.log('Toggling post like:', { postId, isCurrentlyLiked, currentCount });
-      console.log('Decision logic: isCurrentlyLiked =', isCurrentlyLiked, ', so will', isCurrentlyLiked ? 'UNLIKE' : 'LIKE');
+     
 
+      // Get likeId if needed for unlike operation
+      let effectiveLikeId = storedLikeId;
+      
+      if (isCurrentlyLiked && !effectiveLikeId) {
+        // Need to fetch likeId from backend
+        const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
+        const likesData = await likesApi.getPostLikes(postId);
+        const likes = likesData.data?.likes || [];
+        const userLike = likes.find(like => 
+          like.user?._id === currentUserId || like.user?.id === currentUserId
+        );
+        effectiveLikeId = userLike?._id;
+        
+        if (!effectiveLikeId) {
+          throw new Error('Could not find likeId for unlike operation');
+        }
+      }
+
+      // Call API directly
       if (!isCurrentlyLiked) {
-        // LIKE the post
-        console.log('Liking post:', postId);
-
-        const likeData = await likePost(postId);
-        console.log('Like response:', likeData);
-
-        // Store the likeId 
-        const newLikeId = likeData.data?.like?._id;
-        console.log('Like successful, stored likeId:', newLikeId);
-
+        // Like the post
+        const data = await likesApi.likePost(postId);
         return {
           postId,
           isLiked: true,
           count: currentCount + 1,
-          likeId: newLikeId
+          likeId: data.data?.like?._id,
         };
-
       } else {
-        // UNLIKE the post
-        console.log('Unliking post:', postId);
-
-        let likeIdToUse = storedLikeId;
-
-        // If no likeId stored but post is liked, fetch it from backend
-        if (!likeIdToUse) {
-          console.log('No likeId stored, fetching from backend...');
-
-          const likesData = await getPostLikesApi(postId);
-          console.log('Fetched likes for unlike:', likesData);
-
-          // Find current user's like
-          const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
-          const likes = likesData.data?.likes || [];
-
-          const myLike = likes.find(like => {
-            const likeUserId = like.user?._id || like.user?.id;
-            return String(likeUserId) === String(currentUserId);
-          });
-
-          if (myLike) {
-            likeIdToUse = myLike._id;
-            console.log('Found likeId for unlike:', likeIdToUse);
-          } else {
-            throw new Error('Could not find your like for this post');
-          }
-        }
-
-        // Now unlike with the likeId
-        const unlikeData = await unlikePost(postId);
-        console.log('Unlike response:', unlikeData);
-
-        console.log('Unlike successful');
-
+        // Unlike the post
+        await likesApi.unlikePost(effectiveLikeId);
         return {
           postId,
           isLiked: false,
           count: Math.max(0, currentCount - 1),
-          likeId: null
+          likeId: null,
         };
       }
 
@@ -94,7 +70,7 @@ export const togglePostLike = createAsyncThunk(
   }
 );
 
-// Comment like API - simple like toggleCommentLike
+
 export const toggleCommentLike = createAsyncThunk(
   'likes/toggleComment',
   async (commentId, { getState, rejectWithValue }) => {
@@ -104,41 +80,18 @@ export const toggleCommentLike = createAsyncThunk(
       const currentCount = currentLike?.count || 0;
       const isCurrentlyLiked = currentLike?.isLiked || false;
 
-      console.log('Toggling comment like:', { commentId, isCurrentlyLiked, currentCount });
-
-      let data;
-      if (!isCurrentlyLiked) {
-        // Like the comment
-        data = await likeComment(commentId);
-        console.log('Comment like response:', data);
-      } else {
-        // Unlike the comment
-        data = await unlikeComment(commentId);
-        console.log('Comment unlike response:', data);
-      }
-
-      // Check response to determine if liked or unliked
-      if (data.message && data.message.includes('unliked')) {
-        // Comment was unliked
-        console.log('Comment unliked');
-        return {
-          commentId,
-          isLiked: false,
-          count: Math.max(0, currentCount - 1),
-          likeId: null
-        };
-      } else if (data.data?.like) {
-        // Comment was liked
-        console.log('Comment liked, likeId:', data.data.like._id);
-        return {
-          commentId,
-          isLiked: true,
-          count: currentCount + 1,
-          likeId: data.data.like._id
-        };
-      } else {
-        throw new Error('Unexpected response format');
-      }
+      // Call API directly - backend toggles automatically
+      const data = await likesApi.likeComment(commentId);
+      
+      // Determine if it was liked or unliked based on response
+      const wasLiked = !data.message?.includes('unliked');
+      
+      return {
+        commentId,
+        isLiked: wasLiked,
+        count: wasLiked ? currentCount + 1 : Math.max(0, currentCount - 1),
+        likeId: wasLiked ? data.data?.like?._id : null,
+      };
 
     } catch (error) {
       console.error('Comment like error:', error);
@@ -152,12 +105,9 @@ export const getPostLikes = createAsyncThunk(
   'likes/getPostLikes',
   async (postId, { getState, rejectWithValue }) => {
     try {
-      console.log('Get post likes started for ID:', postId);
-
-      const data = await getPostLikesApi(postId);
-      console.log('Get post likes response:', data);
-
+      const data = await likesApi.getPostLikes(postId);
       const likes = data.data?.likes || [];
+      
       const myUserId = getState().auth?.user?._id || getState().auth?.user?.id;
       const mine = likes.find(l => (l?.user?._id || l?.user?.id) === myUserId);
       const myLikeId = mine?._id || mine?.id || null;
@@ -344,12 +294,20 @@ const likesSlice = createSlice({
 
 export const { initializePosts, initializeComments, clearError } = likesSlice.actions;
 export default likesSlice.reducer;
+
+
 const defaultPostLikeState = { isLiked: false, count: 0, likeId: null };
 const defaultCommentLikeState = { isLiked: false, count: 0, likeId: null };
+const defaultPostLikesState = { users: [], loading: false, error: null };
+
 
 export const selectPostLike = (postId) => (state) => state.likes.posts[postId] || defaultPostLikeState;
 export const selectCommentLike = (commentId) => (state) => state.likes.comments[commentId] || defaultCommentLikeState;
 export const selectLikePending = (id) => (state) => !!state.likes.pending[id];
 export const selectLikeError = (state) => state.likes.error;
-export const selectPostLikes = (postId) => (state) => 
-  state.likes.postLikes[postId] || { users: [], loading: false, error: null };
+
+
+export const selectPostLikes = (postId) => createSelector(
+  [(state) => state.likes.postLikes[postId]],
+  (postLikes) => postLikes || defaultPostLikesState
+);

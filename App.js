@@ -3,6 +3,7 @@ import { StatusBar, StyleSheet } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
@@ -18,7 +19,7 @@ import ProfileScreen from './src/screens/profile/ProfileScreen';
 import FollowSomeoneScreen from './src/screens/profile/FollowSomeoneScreen';
 import CountrySelectScreen from './src/screens/CountrySelectScreen';
 import OtpVerificationScreen from './src/screens/auth/OtpVerificationScreen';
-import FullHomeScreen from './src/screens/main/FullHomeScreen';
+import FullHomeScreen from './src/screens/HomeScreen/FullHomeScreen';
 
 
 import { useAppDispatch, useCurrentScreen, useAuthLoading, useAuthError, useAppSelector } from './src/hooks/hooks';
@@ -28,9 +29,9 @@ import { updateUserProfile } from './src/store/slices/userSlice';
 import { updateCommentCount } from './src/store/slices/postsSlice';
 import { API_CONFIG } from './src/config/api';
 import { getAuthToken } from './src/utils/helpers/storage';
-import CreatePostScreen from './src/screens/main/CreatePostScreen';
-import CommentScreen from './src/screens/main/CommentScreen';
-import EditPostScreen from './src/screens/main/EditPostScreen';
+import CreatePostScreen from './src/screens/PostScreen/CreatePostScreen';
+import CommentScreen from './src/screens/PostScreen/CommentScreen';
+import EditPostScreen from './src/screens/PostScreen/EditPostScreen';
 
 function AppContent() {
   const dispatch = useAppDispatch();
@@ -681,11 +682,28 @@ function AppContent() {
   );
 }
 
+
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      staleTime: 1000 * 60, // 1 minute
+      cacheTime: 1000 * 60 * 5, // 5 minutes
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+    mutations: {
+      retry: 1,
+    },
+  },
+});
+
 function App() {
   return (
-    <Provider store={store}>
-      <AppContent />
-    </Provider>
+    <QueryClientProvider client={queryClient}>
+      <Provider store={store}>
+        <AppContent />
+      </Provider>
+    </QueryClientProvider>
   );
 }
 

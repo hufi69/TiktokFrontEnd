@@ -4,8 +4,8 @@ import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import BackButton from '../../components/common/BackButton';
-import AuthInput from '../../components/auth/AuthInput';
-import SocialButton from '../../components/auth/SocialButton';
+import AuthInput from '../AuthScreen/components/AuthInput';
+import SocialButton from '../AuthScreen/components/SocialButton';
 import { colors } from '../../constants/theme';
 
 const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn }) => {
@@ -93,7 +93,7 @@ const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn }) => {
                 styles.primaryButton, 
                 !isFormValid && styles.primaryButtonDisabled
               ]} 
-              onPress={() => isFormValid && onSubmit && onSubmit({ email, password, remember })}
+              onPress={() => isFormValid && onSubmit && onSubmit({ email: email.trim(), password, remember })}
               disabled={!isFormValid}
             >
               <Text style={[

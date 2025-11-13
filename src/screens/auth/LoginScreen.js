@@ -3,8 +3,8 @@ import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BackButton from '../../components/common/BackButton';
-import AuthInput from '../../components/auth/AuthInput';
-import SocialButton from '../../components/auth/SocialButton';
+import AuthInput from '../AuthScreen/components/AuthInput';
+import SocialButton from '../AuthScreen/components/SocialButton';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { colors } from '../../constants/theme';
 
@@ -79,7 +79,7 @@ const LoginScreen = ({ onBack, onSocial, onSubmit, onGoToSignup, onForgetPasswor
               <Text style={styles.rememberText}>Remember me</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.primaryButton, !isFormValid && styles.primaryButtonDisabled]} onPress={() => onSubmit && onSubmit({ email, password, remember })} disabled={!isFormValid}>
+            <TouchableOpacity style={[styles.primaryButton, !isFormValid && styles.primaryButtonDisabled]} onPress={() => onSubmit && onSubmit({ email: email.trim(), password, remember })} disabled={!isFormValid}>
               <Text style={[styles.primaryText, !isFormValid && styles.primaryTextDisabled]}>Login</Text>
             </TouchableOpacity>
 

@@ -1,4 +1,4 @@
-import { postRequest, patchRequest } from './httpClient';
+import { getRequest, postRequest, patchRequest } from './httpClient';
 import { CONFIG } from '../../config';
 
 const MODEL_NAME = '/api/v1/auth';
@@ -91,6 +91,15 @@ export async function googleLogin() {
   try {
     // This would be implemented when Google OAuth is fully set up
     const result = await postRequest(`${MODEL_NAME}/google-login`);
+    return result;
+  } catch (err) {
+    throw err;
+  }
+}
+
+export async function verifyToken() {
+  try {
+    const result = await getRequest('/api/v1/users/getAllUsers');
     return result;
   } catch (err) {
     throw err;

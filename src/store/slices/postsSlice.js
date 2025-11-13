@@ -2,7 +2,8 @@ import { createSlice, createAsyncThunk } from '@reduxjs/toolkit';
 import { API_CONFIG, buildUrl } from '../../config/api';
 import { transformPost } from '../../utils/api/postUtils';
 import { initializePosts, getPostLikes } from './likesSlice';
-import { getPosts, createPost as createPostApi, getPost as getPostApi, updatePost as updatePostApi, deletePost as deletePostApi, createComment } from '../../services/api';
+import * as postsApi from '../../services/api/postsApi';
+import * as commentsApi from '../../services/api/commentsApi';
 //api calls asycn thunks
 const fetchPosts = createAsyncThunk(
   'posts/fetchPosts',
@@ -10,7 +11,7 @@ const fetchPosts = createAsyncThunk(
     try {
       console.log('Fetch posts started');
       
-      const data = await getPosts(50);
+      const data = await postsApi.getPosts(50);
       console.log('Fetch posts response data:', data);
 
       const rawPosts = data.data?.posts || data.posts || [];
@@ -102,7 +103,7 @@ const createPost = createAsyncThunk(
     try {
       console.log('Create post started');
       
-      const data = await createPostApi(postData);
+      const data = await postsApi.createPost(postData);
       console.log('Create post response data:', data);
 
       const rawPost = data.data?.post || data.post;
@@ -144,7 +145,7 @@ const addComment = createAsyncThunk(
 
       console.log('API Request:', { commentData, isReply });
 
-      const data = await createComment(commentData);
+      const data = await commentsApi.createComment(commentData);
       console.log('Comment API response:', data);
 
       // Extract comment from response based on API structure
@@ -211,7 +212,7 @@ const updatePostAsync = createAsyncThunk(
       console.log('Update post started for ID:', postId);
       console.log('Update post data:', postData);
       
-      const data = await updatePostApi(postId, {
+      const data = await postsApi.updatePost(postId, {
         content: postData.content || '',
         // Skip images for now
       });
@@ -238,7 +239,7 @@ const deletePost = createAsyncThunk(
     try {
       console.log('Delete post started for ID:', postId);
       
-      await deletePostApi(postId);
+      await postsApi.deletePost(postId);
       console.log('Delete post successful for ID:', postId);
 
       return postId;

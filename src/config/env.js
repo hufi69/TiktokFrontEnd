@@ -2,7 +2,7 @@
 
 import { CONFIG } from './index';
 
-// environment configuration
+
 export const ENV_CONFIG = {
   API_BASE_URL: CONFIG.API_BASE_URL,
   APP_NAME: CONFIG.APP_NAME,
@@ -12,17 +12,17 @@ export const ENV_CONFIG = {
   ...CONFIG.ENDPOINTS,
 };
 
-// function to get full API URL
+
 export const getApiUrl = (endpoint) => {
   return `${ENV_CONFIG.API_BASE_URL}${endpoint}`;
 };
 
-// Helper function to check if in development
+
 export const isDevelopment = () => {
   return ENV_CONFIG.NODE_ENV === 'development';
 };
 
-// Helper function to log debug messages
+
 export const debugLog = (message, data = null) => {
   if (ENV_CONFIG.DEBUG) {
     console.log(`[DEBUG] ${message}`, data);

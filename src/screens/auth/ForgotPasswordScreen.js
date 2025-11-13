@@ -20,7 +20,7 @@ const ForgotPasswordScreen = ({ onBack, onVerify }) => {
 
     setIsLoading(true);
     try {
-      const result = await dispatch(forgotPassword({ email }));
+      const result = await dispatch(forgotPassword({ email: email.trim() }));
       console.log(' Forgot password result:', result);
       console.log(' Result payload:', result.payload);
       

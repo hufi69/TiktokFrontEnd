@@ -23,11 +23,14 @@ const httpClient = axios.create({
   timeout: defaultTimeout,
 });
 
-// Request interceptor to add Bearer token
+
 httpClient.interceptors.request.use(
   async (config) => {
     try {
-      const token = await AsyncStorage.getItem('authToken');
+
+      const tokenString = await AsyncStorage.getItem('auth_token');
+      const token = tokenString ? JSON.parse(tokenString) : null;
+      
       if (token) {
         config.headers.Authorization = `Bearer ${token}`;
       }

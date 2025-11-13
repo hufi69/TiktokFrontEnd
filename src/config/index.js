@@ -13,8 +13,15 @@ try {
 }
 
 const pickLocalBaseUrl = () => {
-  // For iOS Simulator, use localhost
-  // For real device, use your Mac's IP
+  // Platform detection
+  const Platform = require('react-native').Platform;
+  
+  if (Platform.OS === 'android') {
+    // Android Emulator: 10.0.2.2 is the special alias for host machine's localhost
+    return 'http://10.0.2.2:8000';
+  }
+  
+  // iOS Simulator: localhost works fine
   return 'http://localhost:8000';
 };
 
@@ -146,7 +153,7 @@ export const CONFIG = {
     UPDATE_COMMENT: API_ENDPOINTS.COMMENT_UPDATE,
     REPLY_COMMENT: API_ENDPOINTS.COMMENT_REPLY,
     COMMENT_REPLIES: API_ENDPOINTS.COMMENT_REPLIES,
-    COMMENT_LIKE: API_ENDPOINTS.COMMENT_LIKE,        
+    COMMENT_LIKE: API_ENDPOINTS.COMMENT_LIKE,
     COMMENT_UNLIKE: API_ENDPOINTS.COMMENT_UNLIKE,
 
     // OAuth

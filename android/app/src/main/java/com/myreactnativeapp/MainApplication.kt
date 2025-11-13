@@ -1,4 +1,4 @@
-package com.myreactnativeapp
+package com.toktok
 
 import android.app.Application
 import com.facebook.react.PackageList
