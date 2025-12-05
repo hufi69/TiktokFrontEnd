@@ -24,7 +24,7 @@ export const transformPost = (raw, userId) => {
   const finalCommentsCount = raw?.commentsCount || raw?.commentCount || raw?.comments?.length || raw?.totalComments || 0;
   
   return {
-    id: raw._id,                          // ← canonical id
+    id: raw._id,                          
     user: {
       id: raw?.author?._id,
       username: raw?.author?.fullName || raw?.author?.userName || 'Unknown User',
@@ -56,7 +56,7 @@ export const transformPost = (raw, userId) => {
   };
 };
 
-// ignore this for now 
+
 export const buildStories = (basePosts, user) => {
   const yourAvatar = (() => {
     const pp = user?.profilePicture;
@@ -83,7 +83,6 @@ export const buildStories = (basePosts, user) => {
   return [yourStory, ...userStories];
 };
 
-// ignore this 
 export const insertNewStory = (prevStories, pickedUri) => {
   const [head, ...rest] = prevStories[0]?.isYourStory ? prevStories : [];
   const newStory = {

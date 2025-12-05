@@ -13,7 +13,7 @@ try {
 }
 
 const pickLocalBaseUrl = () => {
-  // Platform detection
+  // Platform detection if using simulator or real device 
   const Platform = require('react-native').Platform;
   
   if (Platform.OS === 'android') {

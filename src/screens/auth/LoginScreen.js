@@ -15,7 +15,6 @@ const LoginScreen = ({ onBack, onSocial, onSubmit, onGoToSignup, onForgetPasswor
   const [secure, setSecure] = useState(true);
   const [focusedField, setFocusedField] = useState(null);
   const passwordRef = useRef(null);
-
   const isEmailValid = email.includes('@') && email.includes('.');
   const isPasswordValid = password.length >= 8;
   const isFormValid = email.trim().length > 0 && password.length > 0;

@@ -15,12 +15,10 @@ const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn }) => {
   const [secure, setSecure] = useState(true);
   const [focusedField, setFocusedField] = useState(null);
   const passwordRef = useRef(null);
-
   // Form validation
   const isFormValid = email.trim().length > 0 && password.length > 0;
   const isEmailValid = email.includes('@') && email.includes('.');
   const isPasswordValid = password.length >= 8;
-
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.bg }}>
       <KeyboardAwareScrollView

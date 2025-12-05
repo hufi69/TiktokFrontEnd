@@ -26,7 +26,7 @@ export const loginUser = createAsyncThunk(
       });
       
       const data = await authApi.signIn(credentials);
-      console.log('✅ Login successful:', {
+      console.log(' Login successful:', {
         hasToken: !!data.token,
         hasUser: !!data.user,
         userId: data.user?._id,
@@ -42,7 +42,7 @@ export const loginUser = createAsyncThunk(
 
       return data;
     } catch (error) {
-      console.error('❌ Login failed:', {
+      console.error(' Login failed:', {
         message: error.message,
         email: credentials.email,
       });
@@ -73,11 +73,8 @@ export const verifyOTP = createAsyncThunk(
   async (otpData, { rejectWithValue }) => {
     try {
       console.log('OTP verification started');
-      
       const data = await authApi.verifyOTP(otpData);
       console.log('OTP verification successful:', data);
-
-      // Persist token and user data in AsyncStorage
       if (data.token) {
         await storeAuthToken(data.token);
       }
@@ -103,7 +100,7 @@ export const forgotPassword = createAsyncThunk(
       const data = await authApi.forgotPassword(email);
       
       console.log('Forgot password successful');
-      return { ...data, email }; // Include email in response for OTP screen
+      return { ...data, email }; 
     } catch (error) {
       console.log('Forgot password error:', error);
       return rejectWithValue(error.message || 'Password reset failed');

@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StatusBar, StyleSheet, Animated } from 'react-native';
+import { StatusBar, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
@@ -46,16 +46,14 @@ function AppContent() {
   // Load stored authentication 
   useEffect(() => {
     const initializeAuth = async () => {
-      console.log(' App initialization started');
-      
-      dispatch(setCurrentScreen('splash'));
-      console.log(' Splash screen set');
+     
+      dispatch(setCurrentScreen('splash'))
       
       await new Promise(resolve => setTimeout(resolve, 2000));
-      console.log(' Splash screen timeout completed');
+     
       
       await dispatch(loadStoredAuth());
-      console.log(' Stored auth loaded');
+     
       
       const token = await getAuthToken();
       console.log('Token check:', { hasToken: !!token, tokenLength: token?.length });
@@ -81,29 +79,73 @@ function AppContent() {
     initializeAuth();
   }, [dispatch]);
 
+  // Track previous screen to detect transition from onboarding
+  const [prevScreen, setPrevScreen] = useState(null);
+  
+  useEffect(() => {
+    // Detect transition from onboarding to welcome
+    if (currentScreen === 'welcome' && prevScreen === 'onboarding') {
+      // Reset and start slide-in animation immediately for smooth transition
+      welcomeSlideAnim.setValue(0);
+      // Use requestAnimationFrame for smoother timing with the previous animation
+      requestAnimationFrame(() => {
+        Animated.timing(welcomeSlideAnim, {
+          toValue: 1,
+          duration: 400,
+          easing: Easing.out(Easing.ease),
+          useNativeDriver: true,
+        }).start();
+      });
+    } else if (currentScreen !== 'welcome') {
+      // Reset animation when leaving welcome screen
+      welcomeSlideAnim.setValue(0);
+    }
+    setPrevScreen(currentScreen);
+  }, [currentScreen, prevScreen, welcomeSlideAnim]);
+
   const handleSplashFinish = () => {
     dispatch(setCurrentScreen('onboarding'));
   };
 
   const handleOnboardingNext = () => {
     if (onboardingStep === 1) {
+     
       Animated.timing(onboardingSlideAnim, {
         toValue: 1,
-        duration: 300,
+        duration: 400,
+        easing: Easing.out(Easing.ease), // Smooth easing
         useNativeDriver: true,
       }).start(() => {
         setOnboardingStep(2);
         onboardingSlideAnim.setValue(0);
       });
     } else {
-      dispatch(setCurrentScreen('welcome'));
-      setOnboardingStep(1);
+      Animated.timing(onboarding2SlideAnim, {
+        toValue: 1,
+        duration: 400,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }).start(() => {
+        setOnboardingStep(1);
+        onboarding2SlideAnim.setValue(0);
+        dispatch(setCurrentScreen('welcome'));
+      });
     }
   };
 
   const handleOnboardingSkip = () => {
-    setOnboardingStep(1);
-    dispatch(setCurrentScreen('welcome'));
+    const currentAnim = onboardingStep === 1 ? onboardingSlideAnim : onboarding2SlideAnim;
+    Animated.timing(currentAnim, {
+      toValue: 1,
+      duration: 300,
+      easing: Easing.out(Easing.ease),
+      useNativeDriver: true,
+    }).start(() => {
+      setOnboardingStep(1);
+      onboardingSlideAnim.setValue(0);
+      onboarding2SlideAnim.setValue(0);
+      dispatch(setCurrentScreen('welcome'));
+    });
   };
 
   const handleSignUp = () => {
@@ -145,7 +187,7 @@ function AppContent() {
       if (loginUser.fulfilled.match(result)) {
         console.log('Login successful!');
         
-        // Check if user is email verified
+     
         if (result.payload.user && result.payload.user.isEmailVerified) {
           console.log('User is email verified, going to home');
           dispatch(setCurrentScreen('home'));
@@ -173,8 +215,8 @@ function AppContent() {
   const handleSignupSubmit = async (data) => {
     console.log(' Signup button clicked with data:', data);
     try {
-      console.log('📡 Making API call to:', API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.SIGNUP);
-      setSignupEmail(data.email); // Store email for OTP screen
+      console.log(' Making API call to:', API_CONFIG.BASE_URL + API_CONFIG.ENDPOINTS.SIGNUP);
+      setSignupEmail(data.email); 
       const result = await dispatch(signupUser(data));
       console.log(' API response:', result);
       
@@ -185,7 +227,7 @@ function AppContent() {
         console.log(' Signup failed:', result.payload);
         const errorMessage = typeof result.payload === 'string' ? result.payload : 'Signup failed. Please try again.';
         
-        // Check if error indicates user already exists
+     
         const errorLower = errorMessage.toLowerCase();
         const isUserExistsError = 
           errorLower.includes('already exist') ||
@@ -225,14 +267,13 @@ function AppContent() {
   const [profileRefreshTrigger, setProfileRefreshTrigger] = useState(0);
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [onboardingSlideAnim] = useState(new Animated.Value(0));
+  const [onboarding2SlideAnim] = useState(new Animated.Value(0));
+  const [welcomeSlideAnim] = useState(new Animated.Value(0));
 
-  // Forgot password handlers
   const handleForgotPasswordVerify = (email) => {
     setForgotPasswordEmail(email);
     dispatch(setCurrentScreen('forgotPasswordOTP'));
   };
-
-  // Forgot password OTP verification handlers
   const handleForgotPasswordOTPBack = () => {
     dispatch(setCurrentScreen('forgotPassword'));
   };
@@ -240,13 +281,13 @@ function AppContent() {
   const handleForgotPasswordOTPVerify = async ({ otp }) => {
     try {
       console.log('🔧 Forgot password OTP verification started with:', otp);
-      // Use the same verifyOTP API as signup - just pass the OTP
+     
       const result = await dispatch(verifyOTP({ otp }));
       console.log('📦 Forgot password OTP verification result:', result);
       
       if (verifyOTP.fulfilled.match(result)) {
         console.log('✅ Forgot password OTP verified successfully!');
-        // Store reset token from response (if available)
+       
         const token = result.payload?.resetToken || result.payload?.token;
         if (token) {
           setResetToken(token);
@@ -495,12 +536,10 @@ function AppContent() {
   };
 
   const handleBackToCountrySelect = () => {
-    // Check if we're coming from profile edit
     const state = store.getState();
     const followSomeoneSource = state.ui.followSomeoneSource;
     
     if (followSomeoneSource === 'profile') {
-      // If we came from profile edit, go back to profile
       dispatch(setCurrentScreen('profile'));
     } else {
       // Default: go to country select (onboarding flow)
@@ -509,18 +548,15 @@ function AppContent() {
   };
 
   const handleBackToFollowSomeone = () => {
-    // Get the source from UI state using getState instead of useAppSelector
     const state = store.getState();
     const followSomeoneSource = state.ui.followSomeoneSource;
-    
     console.log('🔙 Back from follow someone, source:', followSomeoneSource);
     
     if (followSomeoneSource === 'profile') {
-      // If we came from profile, go back to profile and clear selected user ID
       dispatch(setSelectedUserId(null));
       dispatch(setCurrentScreen('profile'));
     } else {
-      // Default fallback to fillProfile (onboarding flow)
+     
       dispatch(setCurrentScreen('fillProfile'));
     }
     
@@ -535,9 +571,18 @@ function AppContent() {
       case 'onboarding':
         const slideTranslateX = onboardingSlideAnim.interpolate({
           inputRange: [0, 1],
-          outputRange: [0, -100],
+          outputRange: [0, -Dimensions.get('window').width],
         });
         const opacity = onboardingSlideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 0],
+        });
+        
+        const slide2TranslateX = onboarding2SlideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -Dimensions.get('window').width],
+        });
+        const opacity2 = onboarding2SlideAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [1, 0],
         });
@@ -559,22 +604,51 @@ function AppContent() {
           );
         } else {
           return (
-            <OnboardingScreen2 
-              onNext={handleOnboardingNext}
-              onSkip={handleOnboardingSkip}
-            />
+            <Animated.View 
+              style={{ 
+                flex: 1, 
+                transform: [{ translateX: slide2TranslateX }],
+                opacity: opacity2 
+                
+              }}
+            >
+              <OnboardingScreen2 
+                onNext={handleOnboardingNext}
+                onSkip={handleOnboardingSkip}
+              />
+            </Animated.View>
           );
         }
       case 'welcome':
+        const welcomeSlideInX = welcomeSlideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [Dimensions.get('window').width, 0],
+        });
+        const welcomeOpacity = welcomeSlideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, 1],
+        });
+        
         return (
-          <WelcomeScreen 
-            onBack={() => dispatch(setCurrentScreen('onboarding'))}
-            onSignUp={handleSignUp}
-            onSignInPassword={handleSignInPassword}
-            onGoogle={() => handleSocialLogin('google')}
-            onFacebook={() => handleSocialLogin('facebook')}
-            onApple={() => handleSocialLogin('apple')}
-          />
+          <Animated.View 
+            style={{ 
+              flex: 1,
+              transform: [{ translateX: welcomeSlideInX }],
+              opacity: welcomeOpacity 
+            }}
+          >
+            <WelcomeScreen 
+              onBack={() => {
+                welcomeSlideAnim.setValue(0);
+                dispatch(setCurrentScreen('onboarding'));
+              }}
+              onSignUp={handleSignUp}
+              onSignInPassword={handleSignInPassword}
+              onGoogle={() => handleSocialLogin('google')}
+              onFacebook={() => handleSocialLogin('facebook')}
+              onApple={() => handleSocialLogin('apple')}
+            />
+          </Animated.View>
         );
       case 'login':
         return (
@@ -708,14 +782,13 @@ function AppContent() {
         return (
           <ProfileScreen
             onBack={() => {
-              // Check if we're viewing someone else's profile from Follow Someone
+         
               const state = store.getState();
               const followSomeoneSource = state.ui.followSomeoneSource;
               if (followSomeoneSource === 'profile' && selectedUserId) {
-                // Go back to Follow Someone screen
                 dispatch(setCurrentScreen('followSomeone'));
               } else {
-                // Go back to home and clear selected user ID
+              
                 dispatch(setSelectedUserId(null));
                 dispatch(setCurrentScreen('home'));
               }
