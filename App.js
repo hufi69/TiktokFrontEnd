@@ -43,24 +43,20 @@ function AppContent() {
   const authError = useAuthError();
   const user = useAppSelector((state) => state.auth.user);
 
-  // Load stored authentication data and verify token on app start
+  // Load stored authentication 
   useEffect(() => {
     const initializeAuth = async () => {
       console.log(' App initialization started');
       
-      // Start with splash screen for better UX
       dispatch(setCurrentScreen('splash'));
       console.log(' Splash screen set');
       
-      // Wait a bit for splash screen to show
       await new Promise(resolve => setTimeout(resolve, 2000));
       console.log(' Splash screen timeout completed');
       
       await dispatch(loadStoredAuth());
       console.log(' Stored auth loaded');
       
-      
-      // If we have a token, verify it with backend
       const token = await getAuthToken();
       console.log('Token check:', { hasToken: !!token, tokenLength: token?.length });
       if (token) {
@@ -68,19 +64,16 @@ function AppContent() {
           const result = await dispatch(verifyToken());
           if (verifyToken.fulfilled.match(result)) {
             console.log(' Token verified, user is authenticated');
-            // User is authenticated, go to home
             dispatch(setCurrentScreen('home'));
           } else {
             console.log(' Token invalid, redirecting to onboarding');
-            // Token is invalid, go to onboarding
             dispatch(setCurrentScreen('onboarding'));
           }
         } catch (error) {
-          console.log('💥 Token verification failed:', error);
+          console.log('################# Token verification failed:', error);
           dispatch(setCurrentScreen('onboarding'));
         }
       } else {
-        // No token, go to onboarding screen
         dispatch(setCurrentScreen('onboarding'));
       }
     };
@@ -94,7 +87,6 @@ function AppContent() {
 
   const handleOnboardingNext = () => {
     if (onboardingStep === 1) {
-      // Animate slide to second onboarding screen
       Animated.timing(onboardingSlideAnim, {
         toValue: 1,
         duration: 300,
@@ -104,14 +96,12 @@ function AppContent() {
         onboardingSlideAnim.setValue(0);
       });
     } else {
-      // Move to welcome screen
-      setOnboardingStep(1);
       dispatch(setCurrentScreen('welcome'));
+      setOnboardingStep(1);
     }
   };
 
   const handleOnboardingSkip = () => {
-    // Reset onboarding step and go to welcome
     setOnboardingStep(1);
     dispatch(setCurrentScreen('welcome'));
   };
@@ -131,24 +121,21 @@ function AppContent() {
       try {
         const result = await dispatch(googleLogin());
         if (googleLogin.fulfilled.match(result)) {
-          console.log(' Google login initiated'); //just icon not implemented yet 
-          // Navigation removed 
+          console.log(' Google login initiated'); 
         } else {
-                  console.log(' Google login failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Google login failed';
-        alert('Google login failed: ' + errorMessage);
+          console.log(' Google login failed:', result.error);
+          const errorMessage = typeof result.error === 'string' ? result.error : 'Google login failed';
+          alert('Google login failed: ' + errorMessage);
         }
       } catch (error) {
-        console.error('image.png Google login error:', error);
+        console.error(' Google login error:', error);
         alert('Google login error: ' + error.message);
       }
     } else {
-      // Social login buttons 
       console.log(`${provider} login clicked - no navigation`);
     }
   };
 
-  // Login screen handlers
   const handleLoginSubmit = async (data) => {
     try {
       console.log('Login started with:', data.email);
@@ -266,14 +253,14 @@ function AppContent() {
         }
         dispatch(setCurrentScreen('createNewPassword'));
       } else if (verifyOTP.rejected.match(result)) {
-        console.log('❌ Forgot password OTP verification failed:', result.error);
+        console.log('❌ Forgot password OTP verification failed:', result.payload);
         const errorMessage = typeof result.payload === 'string' 
           ? result.payload 
           : 'OTP verification failed';
         alert('OTP verification failed: ' + errorMessage);
       }
     } catch (e) {
-      console.error('💥 Forgot password OTP verification error:', e);
+      console.error(' Forgot password OTP verification error:', e);
       alert('OTP verification error: ' + e.message);
     }
   };
@@ -315,7 +302,6 @@ function AppContent() {
       
       if (updateUserProfile.fulfilled.match(result)) {
         console.log('Profile updated successfully!');
-        // Trigger profile refresh and go back to profile screen
         setProfileRefreshTrigger(prev => prev + 1);
         dispatch(setCurrentScreen('profile'));
       } else if (updateUserProfile.rejected.match(result)) {
@@ -335,7 +321,6 @@ function AppContent() {
     dispatch(setCurrentScreen('countrySelect'));
   };
 
-  // Post creation handlers
   const handleCreatePost = () => {
     dispatch(setCurrentScreen('createPost'));
   };
@@ -357,7 +342,7 @@ function AppContent() {
 
   // Centralized handler for updating comment counts from CommentScreen
   const handleCommentCountUpdate = useCallback((postId, newCommentCount) => {
-    console.log('📝 App.js: Updating comment count for post:', postId, 'to:', newCommentCount);
+    console.log(' App.js: Updating comment count for post:', postId, 'to:', newCommentCount);
     dispatch(updateCommentCount({ postId, count: newCommentCount }));
   }, [dispatch]);
 

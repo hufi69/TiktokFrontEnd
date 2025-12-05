@@ -375,8 +375,6 @@ const authSlice = createSlice({
         state.error = action.payload;
       });
 
-    // Verify Forgot Password OTP
-    builder
     // Reset Password
     builder
       .addCase(resetPassword.pending, (state) => {
@@ -530,14 +528,17 @@ const authSlice = createSlice({
     
     builder
       .addCase(updateUserProfile.fulfilled, (state, action) => {
-        
-        state.user = action.payload;
-        console.log('Auth user updated after profile update:', action.payload);
+        // Only update user if payload valid to prevent silent logout
+        if (action.payload && typeof action.payload === 'object' && action.payload._id) {
+          state.user = action.payload;
+          console.log('Auth user updated after profile update:', action.payload);
+        } else {
+          console.warn('################# updateUserProfile returned invalid payload, keeping existing user:', action.payload);
+        }
       });
   },
 });
 
 export const { logout, clearError, setToken, setUser } = authSlice.actions;
 export default authSlice.reducer;
-
 
