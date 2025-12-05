@@ -76,7 +76,7 @@ const OnboardingScreen = ({ onNext, onSkip }) => {
 
      
       <View style={styles.textContainer}>
-        <Text style={styles.onboardingTitle}>Tic Toe Social Media{'\n'}App of the Entertainment</Text>
+        <Text style={styles.onboardingTitle}>Tok Tok Social Media{'\n'}App of the Entertainment</Text>
         <Text style={styles.onboardingDescription}>
           You will be able to{'\n'}
           connect with your friends and followers and share your moments with them.

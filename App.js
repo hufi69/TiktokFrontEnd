@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StatusBar, StyleSheet, Animated, Dimensions, Easing } from 'react-native';
+import { StatusBar, StyleSheet, Animated, Dimensions, Easing, Alert, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
@@ -50,10 +50,7 @@ function AppContent() {
       dispatch(setCurrentScreen('splash'))
       
       await new Promise(resolve => setTimeout(resolve, 2000));
-     
-      
       await dispatch(loadStoredAuth());
-     
       
       const token = await getAuthToken();
       console.log('Token check:', { hasToken: !!token, tokenLength: token?.length });
@@ -83,25 +80,14 @@ function AppContent() {
   const [prevScreen, setPrevScreen] = useState(null);
   
   useEffect(() => {
-    // Detect transition from onboarding to welcome
-    if (currentScreen === 'welcome' && prevScreen === 'onboarding') {
-      // Reset and start slide-in animation immediately for smooth transition
-      welcomeSlideAnim.setValue(0);
-      // Use requestAnimationFrame for smoother timing with the previous animation
-      requestAnimationFrame(() => {
-        Animated.timing(welcomeSlideAnim, {
-          toValue: 1,
-          duration: 400,
-          easing: Easing.out(Easing.ease),
-          useNativeDriver: true,
-        }).start();
-      });
-    } else if (currentScreen !== 'welcome') {
+    // Track screen changes for animation coordination
+    if (currentScreen !== 'welcome') {
       // Reset animation when leaving welcome screen
       welcomeSlideAnim.setValue(0);
     }
     setPrevScreen(currentScreen);
-  }, [currentScreen, prevScreen, welcomeSlideAnim]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [currentScreen]); // Only depend on currentScreen to avoid infinite loops
 
   const handleSplashFinish = () => {
     dispatch(setCurrentScreen('onboarding'));
@@ -120,32 +106,18 @@ function AppContent() {
         onboardingSlideAnim.setValue(0);
       });
     } else {
-      Animated.timing(onboarding2SlideAnim, {
-        toValue: 1,
-        duration: 400,
-        easing: Easing.out(Easing.ease),
-        useNativeDriver: true,
-      }).start(() => {
-        setOnboardingStep(1);
-        onboarding2SlideAnim.setValue(0);
-        dispatch(setCurrentScreen('welcome'));
-      });
+      // Smooth slide animation from screen 2 to welcome
+      startWelcomeTransition(2, 400);
     }
   };
 
   const handleOnboardingSkip = () => {
-    const currentAnim = onboardingStep === 1 ? onboardingSlideAnim : onboarding2SlideAnim;
-    Animated.timing(currentAnim, {
-      toValue: 1,
-      duration: 300,
-      easing: Easing.out(Easing.ease),
-      useNativeDriver: true,
-    }).start(() => {
-      setOnboardingStep(1);
-      onboardingSlideAnim.setValue(0);
-      onboarding2SlideAnim.setValue(0);
-      dispatch(setCurrentScreen('welcome'));
-    });
+    if (onboardingStep === 2) {
+      startWelcomeTransition(2, 300);
+      return;
+    }
+
+    startWelcomeTransition(1, 300);
   };
 
   const handleSignUp = () => {
@@ -196,13 +168,20 @@ function AppContent() {
           dispatch(setCurrentScreen('otp'));
         }
       } else if (loginUser.rejected.match(result)) {
-        console.log(' Login failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Login failed';
-        alert('Login failed: ' + errorMessage);
+        console.log(' Login failed:', result.payload);
+        const errorMessage = typeof result.payload === 'string' ? result.payload : 'Login failed. Please try again.';
+        
+        // Use setTimeout to ensure Alert is shown after current execution completes
+        setTimeout(() => {
+          Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
+        }, 100);
       }
     } catch (error) {
       console.error(' Login error:', error);
-      alert('Login error: ' + error.message);
+      const errorMessage = error.message || 'An unexpected error occurred';
+      setTimeout(() => {
+        Alert.alert('Error', 'Login error: ' + errorMessage, [{ text: 'OK' }]);
+      }, 100);
     }
   };
 
@@ -226,8 +205,6 @@ function AppContent() {
       } else if (signupUser.rejected.match(result)) {
         console.log(' Signup failed:', result.payload);
         const errorMessage = typeof result.payload === 'string' ? result.payload : 'Signup failed. Please try again.';
-        
-     
         const errorLower = errorMessage.toLowerCase();
         const isUserExistsError = 
           errorLower.includes('already exist') ||
@@ -235,11 +212,14 @@ function AppContent() {
           errorLower.includes('email already') ||
           errorLower.includes('already registered');
         
-        if (isUserExistsError) {
-          alert('User already exist');
-        } else {
-          alert('Signup failed: ' + errorMessage);
-        }
+        // Use setTimeout to ensure Alert is shown after current execution completes
+        setTimeout(() => {
+          if (isUserExistsError) {
+            Alert.alert('Error', 'User already exist', [{ text: 'OK' }]);
+          } else {
+            Alert.alert('Error', 'Signup failed: ' + errorMessage, [{ text: 'OK' }]);
+          }
+        }, 100);
       }
     } catch (error) {
       console.error(' Signup error:', error);
@@ -251,11 +231,14 @@ function AppContent() {
         errorLower.includes('email already') ||
         errorLower.includes('already registered');
       
-      if (isUserExistsError) {
-        alert('User already exist');
-      } else {
-        alert('Signup error: ' + errorMessage);
-      }
+      // Use setTimeout to ensure Alert is shown after current execution completes
+      setTimeout(() => {
+        if (isUserExistsError) {
+          Alert.alert('Error', 'User already exist', [{ text: 'OK' }]);
+        } else {
+          Alert.alert('Error', 'Signup error: ' + errorMessage, [{ text: 'OK' }]);
+        }
+      }, 100);
     }
   };
 
@@ -269,6 +252,45 @@ function AppContent() {
   const [onboardingSlideAnim] = useState(new Animated.Value(0));
   const [onboarding2SlideAnim] = useState(new Animated.Value(0));
   const [welcomeSlideAnim] = useState(new Animated.Value(0));
+  const [isTransitioningToWelcome, setIsTransitioningToWelcome] = useState(false);
+  const [transitioningFromStep, setTransitioningFromStep] = useState(null);
+
+  const navigateToWelcomeImmediate = useCallback(() => {
+    setIsTransitioningToWelcome(false);
+    setTransitioningFromStep(null);
+    welcomeSlideAnim.stopAnimation();
+    welcomeSlideAnim.setValue(1);
+    dispatch(setCurrentScreen('welcome'));
+  }, [dispatch, welcomeSlideAnim]);
+
+  const startWelcomeTransition = useCallback((fromStep, duration = 400) => {
+    const outgoingAnim = fromStep === 1 ? onboardingSlideAnim : onboarding2SlideAnim;
+    outgoingAnim.setValue(0);
+    welcomeSlideAnim.setValue(0);
+    setIsTransitioningToWelcome(true);
+    setTransitioningFromStep(fromStep);
+
+    Animated.parallel([
+      Animated.timing(outgoingAnim, {
+        toValue: 1,
+        duration,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+      Animated.timing(welcomeSlideAnim, {
+        toValue: 1,
+        duration,
+        easing: Easing.out(Easing.ease),
+        useNativeDriver: true,
+      }),
+    ]).start(() => {
+      setOnboardingStep(1);
+      outgoingAnim.setValue(0);
+      setIsTransitioningToWelcome(false);
+      setTransitioningFromStep(null);
+      dispatch(setCurrentScreen('welcome'));
+    });
+  }, [dispatch, onboarding2SlideAnim, onboardingSlideAnim, welcomeSlideAnim]);
 
   const handleForgotPasswordVerify = (email) => {
     setForgotPasswordEmail(email);
@@ -457,10 +479,10 @@ function AppContent() {
     console.log(' Logging out user');
     try {
       await dispatch(logoutUser());
-      dispatch(setCurrentScreen('welcome'));
+      navigateToWelcomeImmediate();
     } catch (error) {
       console.error('Logout error:', error);
-      dispatch(setCurrentScreen('welcome'));
+      navigateToWelcomeImmediate();
     }
   };
 
@@ -516,7 +538,7 @@ function AppContent() {
 
   // Back navigation handlers
   const handleBackToWelcome = () => {
-    dispatch(setCurrentScreen('welcome'));
+    navigateToWelcomeImmediate();
   };
 
   const handleBackToLogin = () => {
@@ -568,7 +590,7 @@ function AppContent() {
     switch (currentScreen) {
       case 'splash':
         return <SplashScreen onFinish={handleSplashFinish} />;
-      case 'onboarding':
+      case 'onboarding': {
         const slideTranslateX = onboardingSlideAnim.interpolate({
           inputRange: [0, 1],
           outputRange: [0, -Dimensions.get('window').width],
@@ -586,6 +608,70 @@ function AppContent() {
           inputRange: [0, 1],
           outputRange: [1, 0],
         });
+
+        if (isTransitioningToWelcome && transitioningFromStep) {
+          const outgoingAnim = transitioningFromStep === 1 ? onboardingSlideAnim : onboarding2SlideAnim;
+          const outgoingTranslateX = outgoingAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, -Dimensions.get('window').width],
+          });
+          const outgoingOpacity = outgoingAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [1, 0],
+          });
+          const welcomeSlideOverlay = welcomeSlideAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [Dimensions.get('window').width, 0],
+          });
+          const welcomeOpacityOverlay = welcomeSlideAnim.interpolate({
+            inputRange: [0, 1],
+            outputRange: [0, 1],
+          });
+          const OutgoingComponent = transitioningFromStep === 1 ? OnboardingScreen : OnboardingScreen2;
+
+          return (
+            <View style={{ flex: 1, backgroundColor: '#ffffff' }}>
+              <Animated.View 
+                style={{ 
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  transform: [{ translateX: outgoingTranslateX }],
+                  opacity: outgoingOpacity 
+                }}
+              >
+                <OutgoingComponent 
+                  onNext={handleOnboardingNext}
+                  onSkip={handleOnboardingSkip}
+                />
+              </Animated.View>
+
+              <Animated.View 
+                style={{ 
+                  position: 'absolute',
+                  width: '100%',
+                  height: '100%',
+                  transform: [{ translateX: welcomeSlideOverlay }],
+                  opacity: welcomeOpacityOverlay 
+                }}
+              >
+                <WelcomeScreen 
+                  onBack={() => {
+                    welcomeSlideAnim.setValue(0);
+                    setIsTransitioningToWelcome(false);
+                    setTransitioningFromStep(null);
+                    dispatch(setCurrentScreen('onboarding'));
+                  }}
+                  onSignUp={handleSignUp}
+                  onSignInPassword={handleSignInPassword}
+                  onGoogle={() => handleSocialLogin('google')}
+                  onFacebook={() => handleSocialLogin('facebook')}
+                  onApple={() => handleSocialLogin('apple')}
+                />
+              </Animated.View>
+            </View>
+          );
+        }
         
         if (onboardingStep === 1) {
           return (
@@ -619,6 +705,7 @@ function AppContent() {
             </Animated.View>
           );
         }
+      }
       case 'welcome':
         const welcomeSlideInX = welcomeSlideAnim.interpolate({
           inputRange: [0, 1],
