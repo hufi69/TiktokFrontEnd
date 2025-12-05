@@ -25,13 +25,9 @@ const ForgotPasswordScreen = ({ onBack, onVerify }) => {
       console.log(' Result payload:', result.payload);
       
       if (forgotPassword.fulfilled.match(result)) {
-        Alert.alert('Success', 'Password reset email sent!');
-        // access resetToken 
-        const resetToken = result.payload?.resetToken;
-        console.log(' Reset token:', resetToken);
-        if (resetToken) {
-          onVerify?.(resetToken);
-        }
+        // Navigate to OTP screen instead of showing alert
+        const email = result.payload?.email || email.trim();
+        onVerify?.(email);
       } else {
         const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to send reset email';
         console.log(' Forgot password error:', errorMessage);

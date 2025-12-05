@@ -103,7 +103,7 @@ export const forgotPassword = createAsyncThunk(
       const data = await authApi.forgotPassword(email);
       
       console.log('Forgot password successful');
-      return data;
+      return { ...data, email }; // Include email in response for OTP screen
     } catch (error) {
       console.log('Forgot password error:', error);
       return rejectWithValue(error.message || 'Password reset failed');
@@ -375,6 +375,8 @@ const authSlice = createSlice({
         state.error = action.payload;
       });
 
+    // Verify Forgot Password OTP
+    builder
     // Reset Password
     builder
       .addCase(resetPassword.pending, (state) => {

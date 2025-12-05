@@ -127,7 +127,7 @@ const WelcomeScreen = ({
         </Animated.View>
         
         <Text style={styles.title}>
-          Welcome to <Text style={styles.titlePink}>Tic Toe</Text>
+          Welcome to <Text style={styles.titlePink}>TokTok App</Text>
         </Text>
         <Text style={styles.subtitle}>Connect, share and Lets Have Fun</Text>
       </View>

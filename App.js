@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useCallback } from 'react';
-import { StatusBar, StyleSheet } from 'react-native';
+import { StatusBar, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Provider } from 'react-redux';
 import { store } from './src/store';
@@ -7,10 +7,12 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
 
 import SplashScreen from './src/screens/SplashScreen';
 import OnboardingScreen from './src/screens/OnboardingScreen';
+import OnboardingScreen2 from './src/screens/OnboardingScreen2';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import LoginScreen from './src/screens/auth/LoginScreen';
 import SignupScreen from './src/screens/auth/SignupScreen';
 import ForgotPasswordScreen from './src/screens/auth/ForgotPasswordScreen';
+import ForgotPasswordOTPScreen from './src/screens/auth/ForgotPasswordOTPScreen';
 import CreateNewPasswordScreen from './src/screens/auth/CreateNewPasswordScreen';
 import ChangePasswordScreen from './src/screens/auth/ChangePasswordScreen';
 import ResetSuccessScreen from './src/screens/ResetSuccessScreen';
@@ -91,10 +93,26 @@ function AppContent() {
   };
 
   const handleOnboardingNext = () => {
-    dispatch(setCurrentScreen('welcome'));
+    if (onboardingStep === 1) {
+      // Animate slide to second onboarding screen
+      Animated.timing(onboardingSlideAnim, {
+        toValue: 1,
+        duration: 300,
+        useNativeDriver: true,
+      }).start(() => {
+        setOnboardingStep(2);
+        onboardingSlideAnim.setValue(0);
+      });
+    } else {
+      // Move to welcome screen
+      setOnboardingStep(1);
+      dispatch(setCurrentScreen('welcome'));
+    }
   };
 
   const handleOnboardingSkip = () => {
+    // Reset onboarding step and go to welcome
+    setOnboardingStep(1);
     dispatch(setCurrentScreen('welcome'));
   };
 
@@ -114,20 +132,19 @@ function AppContent() {
         const result = await dispatch(googleLogin());
         if (googleLogin.fulfilled.match(result)) {
           console.log(' Google login initiated'); //just icon not implemented yet 
-          
-          dispatch(setCurrentScreen('countrySelect'));
+          // Navigation removed 
         } else {
                   console.log(' Google login failed:', result.error);
         const errorMessage = typeof result.error === 'string' ? result.error : 'Google login failed';
         alert('Google login failed: ' + errorMessage);
         }
       } catch (error) {
-        console.error('💥 Google login error:', error);
+        console.error('image.png Google login error:', error);
         alert('Google login error: ' + error.message);
       }
     } else {
-      // For other providers, go to country selection
-      dispatch(setCurrentScreen('countrySelect'));
+      // Social login buttons 
+      console.log(`${provider} login clicked - no navigation`);
     }
   };
 
@@ -178,26 +195,87 @@ function AppContent() {
         console.log('Signup successful! Redirecting to OTP verification...');
         dispatch(setCurrentScreen('otp'));
       } else if (signupUser.rejected.match(result)) {
-        console.log(' Signup failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Signup failed. Please try again.';
-        alert('Signup failed: ' + errorMessage);
+        console.log(' Signup failed:', result.payload);
+        const errorMessage = typeof result.payload === 'string' ? result.payload : 'Signup failed. Please try again.';
+        
+        // Check if error indicates user already exists
+        const errorLower = errorMessage.toLowerCase();
+        const isUserExistsError = 
+          errorLower.includes('already exist') ||
+          errorLower.includes('user already exists') ||
+          errorLower.includes('email already') ||
+          errorLower.includes('already registered');
+        
+        if (isUserExistsError) {
+          alert('User already exist');
+        } else {
+          alert('Signup failed: ' + errorMessage);
+        }
       }
     } catch (error) {
       console.error(' Signup error:', error);
-      alert('Signup error: ' + error.message);
+      const errorMessage = error.message || 'An unexpected error occurred';
+      const errorLower = errorMessage.toLowerCase();
+      const isUserExistsError = 
+        errorLower.includes('already exist') ||
+        errorLower.includes('user already exists') ||
+        errorLower.includes('email already') ||
+        errorLower.includes('already registered');
+      
+      if (isUserExistsError) {
+        alert('User already exist');
+      } else {
+        alert('Signup error: ' + errorMessage);
+      }
     }
   };
 
   const [resetToken, setResetToken] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [signupEmail, setSignupEmail] = useState('');
+  const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [editingPost, setEditingPost] = useState(null);
   const [profileRefreshTrigger, setProfileRefreshTrigger] = useState(0);
+  const [onboardingStep, setOnboardingStep] = useState(1);
+  const [onboardingSlideAnim] = useState(new Animated.Value(0));
 
   // Forgot password handlers
-  const handleForgotPasswordVerify = (token) => {
-    setResetToken(token);
-    dispatch(setCurrentScreen('createNewPassword'));
+  const handleForgotPasswordVerify = (email) => {
+    setForgotPasswordEmail(email);
+    dispatch(setCurrentScreen('forgotPasswordOTP'));
+  };
+
+  // Forgot password OTP verification handlers
+  const handleForgotPasswordOTPBack = () => {
+    dispatch(setCurrentScreen('forgotPassword'));
+  };
+
+  const handleForgotPasswordOTPVerify = async ({ otp }) => {
+    try {
+      console.log('🔧 Forgot password OTP verification started with:', otp);
+      // Use the same verifyOTP API as signup - just pass the OTP
+      const result = await dispatch(verifyOTP({ otp }));
+      console.log('📦 Forgot password OTP verification result:', result);
+      
+      if (verifyOTP.fulfilled.match(result)) {
+        console.log('✅ Forgot password OTP verified successfully!');
+        // Store reset token from response (if available)
+        const token = result.payload?.resetToken || result.payload?.token;
+        if (token) {
+          setResetToken(token);
+        }
+        dispatch(setCurrentScreen('createNewPassword'));
+      } else if (verifyOTP.rejected.match(result)) {
+        console.log('❌ Forgot password OTP verification failed:', result.error);
+        const errorMessage = typeof result.payload === 'string' 
+          ? result.payload 
+          : 'OTP verification failed';
+        alert('OTP verification failed: ' + errorMessage);
+      }
+    } catch (e) {
+      console.error('💥 Forgot password OTP verification error:', e);
+      alert('OTP verification error: ' + e.message);
+    }
   };
 
   // Create new password handlers
@@ -301,6 +379,9 @@ function AppContent() {
 
   // Reset success handlers
   const handleResetSuccessDone = () => {
+    // Navigate to login screen instead of home
+    setResetToken(null);
+    setForgotPasswordEmail('');
     dispatch(setCurrentScreen('login'));
   };
 
@@ -467,12 +548,38 @@ function AppContent() {
       case 'splash':
         return <SplashScreen onFinish={handleSplashFinish} />;
       case 'onboarding':
-        return (
-          <OnboardingScreen 
-            onNext={handleOnboardingNext}
-            onSkip={handleOnboardingSkip}
-          />
-        );
+        const slideTranslateX = onboardingSlideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [0, -100],
+        });
+        const opacity = onboardingSlideAnim.interpolate({
+          inputRange: [0, 1],
+          outputRange: [1, 0],
+        });
+        
+        if (onboardingStep === 1) {
+          return (
+            <Animated.View 
+              style={{ 
+                flex: 1, 
+                transform: [{ translateX: slideTranslateX }],
+                opacity 
+              }}
+            >
+              <OnboardingScreen 
+                onNext={handleOnboardingNext}
+                onSkip={handleOnboardingSkip}
+              />
+            </Animated.View>
+          );
+        } else {
+          return (
+            <OnboardingScreen2 
+              onNext={handleOnboardingNext}
+              onSkip={handleOnboardingSkip}
+            />
+          );
+        }
       case 'welcome':
         return (
           <WelcomeScreen 
@@ -510,7 +617,17 @@ function AppContent() {
             onVerify={handleForgotPasswordVerify}
           />
         );
-              case 'otp':
+      case 'forgotPasswordOTP':
+        return (
+          <ForgotPasswordOTPScreen
+            onBack={handleForgotPasswordOTPBack}
+            onVerify={handleForgotPasswordOTPVerify}
+            email={forgotPasswordEmail}
+            loading={authLoading}
+            error={authError}
+          />
+        );
+      case 'otp':
           return (
             <OtpVerificationScreen
               onBack={handleOtpBack}
@@ -520,14 +637,14 @@ function AppContent() {
               email={signupEmail}
             />
           );
-                  case 'createNewPassword':
-              return (
-                <CreateNewPasswordScreen
-                  onBack={handleBackToForgotPassword}
-                  onContinue={handleCreatePasswordContinue}
-                  resetToken={resetToken}
-                />
-              );
+      case 'createNewPassword':
+        return (
+          <CreateNewPasswordScreen
+            onBack={() => dispatch(setCurrentScreen('forgotPasswordOTP'))}
+            onContinue={handleCreatePasswordContinue}
+            resetToken={resetToken}
+          />
+        );
               case 'changePassword':
               return (
                 <ChangePasswordScreen

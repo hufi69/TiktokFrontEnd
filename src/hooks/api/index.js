@@ -1,8 +1,3 @@
-/**
- * API Hooks Index
- * React Query hooks for server state management
- * Handles all API calls, caching, and mutations
- */
 
 // Auth hooks
 export * from './useAuthQuery';

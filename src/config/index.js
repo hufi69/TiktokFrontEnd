@@ -1,9 +1,9 @@
 
 
 
-const CURRENT_ENV = 'LOCAL'; 
+const CURRENT_ENV = 'PRODUCTION'; 
 
-// Optional .env override for API base URL when running on real devices
+
 let ENV_API_BASE_URL = undefined;
 try {
   
@@ -17,11 +17,11 @@ const pickLocalBaseUrl = () => {
   const Platform = require('react-native').Platform;
   
   if (Platform.OS === 'android') {
-    // Android Emulator: 10.0.2.2 is the special alias for host machine's localhost
+  
     return 'http://10.0.2.2:8000';
   }
   
-  // iOS Simulator: localhost works fine
+
   return 'http://localhost:8000';
 };
 
@@ -30,7 +30,8 @@ const ENVIRONMENTS = {
  
   USB_DEBUG: { API_BASE_URL: ENV_API_BASE_URL || 'http://192.168.0.192:8000', DEBUG: true },
   NGROK: { API_BASE_URL: 'https://your-ngrok-url.ngrok-free.app', DEBUG: true },
-   PRODUCTION: { API_BASE_URL: 'http://46.101.95.75', DEBUG: true }
+  PRODUCTION: { API_BASE_URL: 'http://51.20.81.225', DEBUG: true },
+
 };
 
 const API_ENDPOINTS = {
@@ -107,7 +108,7 @@ const getCurrentConfig = () => {
   return config;
 };
 
-// Export configuration
+
 export const CONFIG = {
   ...getCurrentConfig(),
   ENDPOINTS: {
