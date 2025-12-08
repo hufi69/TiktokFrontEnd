@@ -18,13 +18,19 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
 
   const handleImagePicker = async (type) => {
     try {
+      const remainingSlots = 5 - images.length;
+      if (remainingSlots <= 0) {
+        Alert.alert('Limit Reached', 'You can only add up to 5 images per post.');
+        return;
+      }
+
       const options = {
         mediaType: 'photo',
         quality: 0.8,
         maxWidth: 1024,
         maxHeight: 1024,
         multiple: true,
-        selectionLimit: 5,
+        selectionLimit: remainingSlots,
       };
 
       const result = type === 'camera' 
@@ -32,12 +38,16 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
         : await launchImageLibrary(options);
 
       if (result.assets && result.assets.length > 0) {
-        const newImages = result.assets.map(asset => ({
+        const imagesToAdd = result.assets.slice(0, remainingSlots);
+        const newImages = imagesToAdd.map(asset => ({
           uri: asset.uri,
           type: asset.type,
           name: asset.fileName || `image_${Date.now()}.jpg`,
         }));
         setImages([...images, ...newImages]);
+        if (result.assets.length > remainingSlots) {
+          Alert.alert('Limit Reached', `Only ${remainingSlots} image(s) added. Maximum 5 images per post.`);
+        }
       }
     } catch (error) {
       Alert.alert('Error', 'Failed to pick image');

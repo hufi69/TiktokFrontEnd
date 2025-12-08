@@ -50,12 +50,24 @@ const ChangePasswordScreen = ({ onBack, onSuccess }) => {
         Alert.alert('Success', 'Password changed successfully!', [
           { text: 'OK', onPress: () => onSuccess?.() }
         ]);
-      } else {
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to change password';
-        Alert.alert('Error', errorMessage);
+      } else if (changePassword.rejected.match(result)) {
+        // Redux Toolkit stores error in payload, not error
+        const errorMessage = result.payload || 'Failed to change password';
+        
+        // Format error message for "Incorrect password"
+        let displayMessage = errorMessage;
+        if (errorMessage.toLowerCase().includes('incorrect password')) {
+          displayMessage = 'ERROR : incorrect password';
+        }
+        
+        Alert.alert('Error', displayMessage);
       }
     } catch (error) {
-      Alert.alert('Error', error.message);
+      let displayMessage = error.message || 'Failed to change password';
+      if (displayMessage.toLowerCase().includes('incorrect password')) {
+        displayMessage = 'ERROR : incorrect password';
+      }
+      Alert.alert('Error', displayMessage);
     }
   };
 
@@ -133,7 +145,13 @@ const ChangePasswordScreen = ({ onBack, onSuccess }) => {
             </TouchableOpacity>
           </View>
 
-          {error ? <Text style={styles.errorText}>{String(error)}</Text> : null}
+          {error ? (
+            <Text style={styles.errorText}>
+              {error.toLowerCase().includes('incorrect password') 
+                ? 'ERROR : incorrect password' 
+                : String(error)}
+            </Text>
+          ) : null}
 
           <TouchableOpacity
             style={[styles.changeButton, disabled && styles.changeButtonDisabled]}

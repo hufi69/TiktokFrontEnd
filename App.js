@@ -26,7 +26,7 @@ import FullHomeScreen from './src/screens/HomeScreen/FullHomeScreen';
 
 import { useAppDispatch, useCurrentScreen, useAuthLoading, useAuthError, useAppSelector } from './src/hooks/hooks';
 import { setCurrentScreen, setSelectedUserId, setFollowSomeoneSource } from './src/store/slices/uiSlice';
-import { loginUser, signupUser, updateUserCountry, loadStoredAuth, verifyOTP, verifyToken, logoutUser, googleLogin } from './src/store/slices/authSlice';
+import { loginUser, signupUser, updateUserCountry, loadStoredAuth, verifyOTP, verifyResetPasswordOTP, verifyToken, logoutUser, googleLogin } from './src/store/slices/authSlice';
 import { updateUserProfile } from './src/store/slices/userSlice';
 import { updateCommentCount } from './src/store/slices/postsSlice';
 import { API_CONFIG } from './src/config/api';
@@ -242,7 +242,7 @@ function AppContent() {
     }
   };
 
-  const [resetToken, setResetToken] = useState(null);
+  const [resetOTP, setResetOTP] = useState(null);
   const [selectedPost, setSelectedPost] = useState(null);
   const [signupEmail, setSignupEmail] = useState('');
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
@@ -304,32 +304,30 @@ function AppContent() {
     try {
       console.log('🔧 Forgot password OTP verification started with:', otp);
      
-      const result = await dispatch(verifyOTP({ otp }));
+      const result = await dispatch(verifyResetPasswordOTP({ otp }));
       console.log('📦 Forgot password OTP verification result:', result);
       
-      if (verifyOTP.fulfilled.match(result)) {
+      if (verifyResetPasswordOTP.fulfilled.match(result)) {
         console.log('✅ Forgot password OTP verified successfully!');
-       
-        const token = result.payload?.resetToken || result.payload?.token;
-        if (token) {
-          setResetToken(token);
-        }
+        // Store the OTP to use in reset password API
+        setResetOTP(otp);
         dispatch(setCurrentScreen('createNewPassword'));
-      } else if (verifyOTP.rejected.match(result)) {
+      } else if (verifyResetPasswordOTP.rejected.match(result)) {
         console.log('❌ Forgot password OTP verification failed:', result.payload);
         const errorMessage = typeof result.payload === 'string' 
           ? result.payload 
           : 'OTP verification failed';
-        alert('OTP verification failed: ' + errorMessage);
+        Alert.alert('Error', errorMessage);
       }
     } catch (e) {
       console.error(' Forgot password OTP verification error:', e);
-      alert('OTP verification error: ' + e.message);
+      Alert.alert('Error', e.message || 'OTP verification error');
     }
   };
 
   // Create new password handlers
   const handleCreatePasswordContinue = () => {
+    setResetOTP(null); // Clear OTP after successful reset
     dispatch(setCurrentScreen('resetSuccess'));
   };
 
@@ -428,7 +426,7 @@ function AppContent() {
   // Reset success handlers
   const handleResetSuccessDone = () => {
     // Navigate to login screen instead of home
-    setResetToken(null);
+    setResetOTP(null);
     setForgotPasswordEmail('');
     dispatch(setCurrentScreen('login'));
   };
@@ -788,7 +786,7 @@ function AppContent() {
           <CreateNewPasswordScreen
             onBack={() => dispatch(setCurrentScreen('forgotPasswordOTP'))}
             onContinue={handleCreatePasswordContinue}
-            resetToken={resetToken}
+            resetOTP={resetOTP}
           />
         );
               case 'changePassword':
@@ -882,6 +880,7 @@ function AppContent() {
             }}
             onEditProfile={handleEditProfile}
             onSettings={handleProfileSettings}
+            onCreatePost={handleCreatePost}
             onFollowSomeone={handleProfileFollowSomeone}
             route={{ params: { userId: selectedUserId } }}
             refreshTrigger={profileRefreshTrigger}

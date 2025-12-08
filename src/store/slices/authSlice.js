@@ -90,6 +90,21 @@ export const verifyOTP = createAsyncThunk(
   }
 );
 
+export const verifyResetPasswordOTP = createAsyncThunk(
+  'auth/verifyResetPasswordOTP',
+  async (otpData, { rejectWithValue }) => {
+    try {
+      console.log('Reset password OTP verification started');
+      const data = await authApi.verifyResetPasswordOTP(otpData);
+      console.log('Reset password OTP verification successful:', data);
+      return data;
+    } catch (error) {
+      console.log('Reset password OTP verification error:', error);
+      return rejectWithValue(error.message || 'OTP verification failed');
+    }
+  }
+);
+
 export const forgotPassword = createAsyncThunk(
   'auth/forgotPassword',
   async (emailData, { rejectWithValue }) => {
@@ -110,16 +125,16 @@ export const forgotPassword = createAsyncThunk(
 
 export const resetPassword = createAsyncThunk(
   'auth/resetPassword',
-  async ({ token, password, newPassword, confirmNewPassword }, { rejectWithValue }) => {
+  async ({ otp, newPassword, confirmNewPassword }, { rejectWithValue }) => {
     try {
       console.log('Reset password started');
       
       const passwordData = {
-        newPassword: newPassword || password,
-        confirmNewPassword: confirmNewPassword || password,
+        newPassword: newPassword,
+        confirmNewPassword: confirmNewPassword,
       };
 
-      const data = await authApi.resetPassword(token, passwordData);
+      const data = await authApi.resetPassword(otp, passwordData);
       console.log('Reset password response:', data);
 
       return data;
@@ -401,6 +416,21 @@ const authSlice = createSlice({
         state.error = null;
       })
       .addCase(verifyOTP.rejected, (state, action) => {
+        state.isLoading = false;
+        state.error = action.payload;
+      });
+
+    // Verify Reset Password OTP
+    builder
+      .addCase(verifyResetPasswordOTP.pending, (state) => {
+        state.isLoading = true;
+        state.error = null;
+      })
+      .addCase(verifyResetPasswordOTP.fulfilled, (state) => {
+        state.isLoading = false;
+        state.error = null;
+      })
+      .addCase(verifyResetPasswordOTP.rejected, (state, action) => {
         state.isLoading = false;
         state.error = action.payload;
       });

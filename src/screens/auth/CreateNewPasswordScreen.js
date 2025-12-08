@@ -7,7 +7,7 @@ import { resetPassword } from '../../store/slices/authSlice';
 import BackButton from '../../components/common/BackButton';
 import { colors } from '../../constants/theme';
 const illustrationImage = require('../../assets/toktok(1).png');
-const CreateNewPasswordScreen = ({ onBack, onContinue, resetToken }) => {
+const CreateNewPasswordScreen = ({ onBack, onContinue, resetOTP }) => {
   const dispatch = useAppDispatch();
   const [p1, setP1] = useState('');
   const [p2, setP2] = useState('');
@@ -38,20 +38,21 @@ const CreateNewPasswordScreen = ({ onBack, onContinue, resetToken }) => {
   }, [valid, isLoading]);
 
   const handleResetPassword = async () => {
-    if (!valid) return;
+    if (!valid || !resetOTP) return;
 
     setIsLoading(true);
     try {
       const result = await dispatch(resetPassword({ 
-        token: resetToken, 
-        password: p1 
+        otp: resetOTP,
+        newPassword: p1,
+        confirmNewPassword: p2
       }));
       
       if (resetPassword.fulfilled.match(result)) {
         Alert.alert('Success', 'Password reset successfully!');
         onContinue?.();
       } else if (resetPassword.rejected.match(result)) {
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to reset password';
+        const errorMessage = typeof result.payload === 'string' ? result.payload : 'Failed to reset password';
         Alert.alert('Error', errorMessage);
       } else {
         Alert.alert('Error', 'Failed to reset password');

@@ -168,7 +168,7 @@ const UserListItem = ({ user, onPress, showFollowButton = false }) => {
   );
 };
 
-const PostGrid = ({ posts, onPostPress, refreshing, onRefresh }) => {
+const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isOwnProfile }) => {
   const renderPostItem = ({ item }) => {
     const images = (item.media || [])
       .filter(m => m.type === 'image' && m.url)
@@ -210,18 +210,27 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh }) => {
       ListEmptyComponent={() => (
         <View style={styles.emptyPostsContainer}>
           <Icon name="camera" size={48} color={colors.muted} />
-          <Text style={styles.emptyPostsTitle}>Create your first post</Text>
-          <Text style={styles.emptyPostsSubtitle}>Give this space some love.</Text>
-          <TouchableOpacity style={styles.createPostButton}>
-            <Text style={styles.createPostButtonText}>Create</Text>
-          </TouchableOpacity>
+          <Text style={styles.emptyPostsTitle}>
+            {isOwnProfile ? 'Create your first post' : 'No posts yet'}
+          </Text>
+          <Text style={styles.emptyPostsSubtitle}>
+            {isOwnProfile ? 'Give this space some love.' : 'This user hasn\'t posted anything yet.'}
+          </Text>
+          {isOwnProfile && onCreatePost && (
+            <TouchableOpacity 
+              style={styles.createPostButton}
+              onPress={onCreatePost}
+            >
+              <Text style={styles.createPostButtonText}>Create</Text>
+            </TouchableOpacity>
+          )}
         </View>
       )}
     />
   );
 };
 
-const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, onFollowSomeone, refreshTrigger }) => {
+const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, onFollowSomeone, onCreatePost, refreshTrigger }) => {
   const dispatch = useAppDispatch();
   const { user: currentUser } = useAppSelector(state => state.auth);
   const { 
@@ -445,6 +454,8 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
             onPostPress={handlePostPress}
             refreshing={refreshing}
             onRefresh={handleRefresh}
+            onCreatePost={onCreatePost}
+            isOwnProfile={isOwnProfile}
           />
         );
       case 'followers':
@@ -857,7 +868,7 @@ const styles = StyleSheet.create({
     marginBottom: 24,
   },
   createPostButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.pink,
     paddingHorizontal: 24,
     paddingVertical: 12,
     borderRadius: 8,

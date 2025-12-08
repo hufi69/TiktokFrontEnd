@@ -230,8 +230,8 @@ export const fetchUserPosts = createAsyncThunk(
     try {
       console.log('Fetch user posts started for ID:', userId);
       
-      // Fetch posts by author (user)
-      const data = await postsApi.getPosts(50);
+      // Fetch posts by author (user) using the correct endpoint
+      const data = await postsApi.getUserPosts(userId);
       console.log('Fetch user posts response:', data);
 
       return { userId, posts: data.data?.posts || [] };

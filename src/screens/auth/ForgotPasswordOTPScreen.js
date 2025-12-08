@@ -73,7 +73,7 @@ const ForgotPasswordOTPScreen = ({ onBack, onVerify, email, loading, error }) =>
   };
 
   const handleResendOTP = async () => {
-    if (!canResend || !email) {
+    if (!canResend || !email || resendLoading) {
       return;
     }
 
@@ -86,8 +86,8 @@ const ForgotPasswordOTPScreen = ({ onBack, onVerify, email, loading, error }) =>
         setCanResend(false);
         setOtp(['', '', '', '', '', '']);
         inputRefs[0].current?.focus();
-      } else {
-        const errorMessage = result.error || 'Failed to resend OTP';
+      } else if (resendOTP.rejected.match(result)) {
+        const errorMessage = result.payload || 'Failed to resend OTP';
         Alert.alert('Error', errorMessage);
       }
     } catch (error) {
@@ -151,10 +151,22 @@ const ForgotPasswordOTPScreen = ({ onBack, onVerify, email, loading, error }) =>
           )}
 
           <View style={styles.resendContainer}>
-            <Text style={styles.resendText}>
-              Resend code in{' '}
-              <Text style={styles.countdownText}>{countdown} s</Text>
-            </Text>
+            {canResend ? (
+              <TouchableOpacity
+                onPress={handleResendOTP}
+                disabled={resendLoading}
+                style={styles.resendButton}
+              >
+                <Text style={styles.resendButtonText}>
+                  {resendLoading ? 'Sending...' : 'Resend'}
+                </Text>
+              </TouchableOpacity>
+            ) : (
+              <Text style={styles.resendText}>
+                Resend code in{' '}
+                <Text style={styles.countdownText}>{countdown} s</Text>
+              </Text>
+            )}
           </View>
 
           <TouchableOpacity
@@ -242,6 +254,17 @@ const styles = StyleSheet.create({
   },
   countdownText: {
     color: colors.error,
+    fontWeight: '600',
+  },
+  resendButton: {
+    paddingVertical: 8,
+    paddingHorizontal: 24,
+    borderRadius: 20,
+    backgroundColor: colors.pink,
+  },
+  resendButtonText: {
+    fontSize: 14,
+    color: '#fff',
     fontWeight: '600',
   },
   verifyButton: {

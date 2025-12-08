@@ -64,6 +64,7 @@ const API_ENDPOINTS = {
   POSTS_LIST: '/api/v1/posts/get-posts',
   POST_CREATE: '/api/v1/posts/new-post',
   POST_GET: '/api/v1/posts/get-post/:id',
+  POST_GET_BY_USER: '/api/v1/posts/get-post/user/:id',
   POST_UPDATE: '/api/v1/posts/get-post/:id',
   POST_DELETE: '/api/v1/posts/get-post/:id',
   POST_LIKE: '/api/v1/likes/like',

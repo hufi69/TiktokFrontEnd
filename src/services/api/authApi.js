@@ -1,4 +1,4 @@
-import { getRequest, postRequest, patchRequest } from './httpClient';
+import { getRequest, postRequest } from './httpClient';
 import { CONFIG } from '../../config';
 
 const MODEL_NAME = '/api/v1/auth';
@@ -44,6 +44,19 @@ export async function verifyOTP(otpData) {
   }
 }
 
+export async function verifyResetPasswordOTP(otpData) {
+  try {
+    const payload = {
+      otp: otpData.otp
+    };
+
+    const result = await postRequest(`${MODEL_NAME}/verify-reset-password-otp`, payload);
+    return result;
+  } catch (err) {
+    throw err;
+  }
+}
+
 export async function resendOTP(email) {
   try {
     const payload = { email };
@@ -64,14 +77,15 @@ export async function forgotPassword(email) {
   }
 }
 
-export async function resetPassword(token, passwordData) {
+export async function resetPassword(otp, passwordData) {
   try {
     const payload = {
+      otp: otp,
       newPassword: passwordData.newPassword || passwordData.password,
       confirmNewPassword: passwordData.confirmNewPassword || passwordData.password
     };
 
-    const result = await postRequest(`${CONFIG.ENDPOINTS.AUTH_RESET_PASSWORD.replace(':token', token)}`, payload);
+    const result = await postRequest(`${MODEL_NAME}/reset-password`, payload);
     return result;
   } catch (err) {
     throw err;
@@ -80,7 +94,7 @@ export async function resetPassword(token, passwordData) {
 
 export async function changePassword(passwordData) {
   try {
-    const result = await patchRequest(`${MODEL_NAME}/change-password`, passwordData);
+    const result = await postRequest(`${MODEL_NAME}/change-password`, passwordData);
     return result;
   } catch (err) {
     throw err;

@@ -19,10 +19,39 @@ import AuthInput from '../AuthScreen/components/AuthInput';
 import { colors } from '../../constants/theme';
 
 const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, onEditCountry }) => {
+  // Helper function to format date for display (extract YYYY-MM-DD from ISO or keep YYYY-MM-DD)
+  const formatDateForDisplay = (dateStr) => {
+    if (!dateStr) return '';
+    // If it's already in YYYY-MM-DD format, return as is
+    if (dateStr.match(/^\d{4}-\d{2}-\d{2}$/)) return dateStr;
+    // If it's in full ISO format (YYYY-MM-DDTHH:mm:ss.sssZ), extract just YYYY-MM-DD
+    if (dateStr.includes('-') && dateStr.includes('T')) {
+      return dateStr.split('T')[0];
+    }
+    // If it's in ISO format without time, return as is
+    if (dateStr.includes('-')) {
+      const date = new Date(dateStr);
+      if (!isNaN(date.getTime())) {
+        const year = date.getFullYear();
+        const month = String(date.getMonth() + 1).padStart(2, '0');
+        const day = String(date.getDate()).padStart(2, '0');
+        return `${year}-${month}-${day}`;
+      }
+    }
+    // If it's in MM/DD/YYYY format, convert to YYYY-MM-DD
+    if (dateStr.includes('/')) {
+      const [month, day, year] = dateStr.split('/');
+      if (month && day && year && year.length === 4) {
+        return `${year}-${month.padStart(2, '0')}-${day.padStart(2, '0')}`;
+      }
+    }
+    return dateStr;
+  };
+
   const [profileImage, setProfileImage] = useState(userData?.profilePicture ? { uri: userData.profilePicture } : null);
   const [fullName, setFullName] = useState(userData?.fullName || '');
   const [username, setUsername] = useState(userData?.userName || '');
-  const [dateOfBirth, setDateOfBirth] = useState(userData?.dateOfBirth || '');
+  const [dateOfBirth, setDateOfBirth] = useState(formatDateForDisplay(userData?.dateOfBirth));
   const [email, setEmail] = useState(userData?.email || '');
   const [phoneNumber, setPhoneNumber] = useState(userData?.phoneNumber || '');
   const [countryCode, setCountryCode] = useState('+1');
@@ -192,13 +221,13 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
   };
 
   const handleDateChange = (text) => {
-    // Simple date formatting MM/DD/YYYY
+    // Date formatting YYYY-MM-DD
     let cleaned = text.replace(/\D/g, '');
-    if (cleaned.length >= 2) {
-      cleaned = cleaned.substring(0, 2) + '/' + cleaned.substring(2);
+    if (cleaned.length >= 4) {
+      cleaned = cleaned.substring(0, 4) + '-' + cleaned.substring(4);
     }
-    if (cleaned.length >= 5) {
-      cleaned = cleaned.substring(0, 5) + '/' + cleaned.substring(5, 9);
+    if (cleaned.length >= 7) {
+      cleaned = cleaned.substring(0, 7) + '-' + cleaned.substring(7, 9);
     }
     setDateOfBirth(cleaned);
   };
@@ -268,7 +297,7 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
             <AuthInput
               ref={dobRef}
               icon="calendar"
-              placeholder="MM/DD/YYYY"
+              placeholder="YYYY-MM-DD"
               value={dateOfBirth}
               onChangeText={handleDateChange}
               onFocus={() => setFocusedField('dob')}

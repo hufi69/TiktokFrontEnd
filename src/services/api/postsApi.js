@@ -21,6 +21,15 @@ export async function getPost(postId) {
   }
 }
 
+export async function getUserPosts(userId) {
+  try {
+    const result = await getRequest(`${CONFIG.ENDPOINTS.POST_GET_BY_USER.replace(':id', userId)}`);
+    return result;
+  } catch (err) {
+    throw err;
+  }
+}
+
 export async function createPost(postData) {
   try {
     const formData = new FormData();

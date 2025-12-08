@@ -8,11 +8,9 @@ import {
   Image,
   Alert,
   ScrollView,
-  Platform,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
-import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useAppDispatch } from '../../hooks/hooks';
 import { updatePostAsync } from '../../store/slices/postsSlice';
 import { colors } from '../../constants/theme';
@@ -20,157 +18,18 @@ import { colors } from '../../constants/theme';
 const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
   const dispatch = useAppDispatch();
   const [content, setContent] = useState(post?.caption || '');
-  const [images, setImages] = useState(post?.images || []);
   const [isLoading, setIsLoading] = useState(false);
 
   useEffect(() => {
     if (post) {
       console.log('Post data for editing:', post);
       setContent(post.caption || post.content || '');
-      setImages(post.images || []);
     }
   }, [post]);
 
-  const requestCameraPermission = async () => {
-    if (Platform.OS === 'android') {
-      const { PermissionsAndroid } = require('react-native');
-      try {
-        const granted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.CAMERA,
-          {
-            title: 'Camera Permission',
-            message: 'This app needs access to your camera to take photos.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        return granted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn(err);
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const requestStoragePermission = async () => {
-    if (Platform.OS === 'android') {
-      const { PermissionsAndroid } = require('react-native');
-      try {
-        // Request both READ and WRITE permissions
-        const readGranted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.READ_EXTERNAL_STORAGE,
-          {
-            title: 'Storage Permission',
-            message: 'This app needs access to your storage to select photos.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        
-        const writeGranted = await PermissionsAndroid.request(
-          PermissionsAndroid.PERMISSIONS.WRITE_EXTERNAL_STORAGE,
-          {
-            title: 'Storage Permission',
-            message: 'This app needs access to your storage to select photos.',
-            buttonNeutral: 'Ask Me Later',
-            buttonNegative: 'Cancel',
-            buttonPositive: 'OK',
-          }
-        );
-        
-        return readGranted === PermissionsAndroid.RESULTS.GRANTED && 
-               writeGranted === PermissionsAndroid.RESULTS.GRANTED;
-      } catch (err) {
-        console.warn(err);
-        return false;
-      }
-    }
-    return true;
-  };
-
-  const handleTakePhoto = async () => {
-    const hasPermission = await requestCameraPermission();
-    if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
-      return;
-    }
-
-    try {
-      const result = await launchCamera({
-        mediaType: 'photo',
-        quality: 0.8,
-        includeBase64: false,
-      });
-
-      if (!result.didCancel && result.assets && result.assets.length > 0) {
-        const newImage = {
-          uri: result.assets[0].uri,
-          type: result.assets[0].type || 'image/jpeg',
-          name: result.assets[0].fileName || 'photo.jpg',
-        };
-        setImages(prev => [...prev, newImage]);
-      }
-    } catch (error) {
-      console.error('Camera error:', error);
-      Alert.alert('Error', 'Failed to take photo');
-    }
-  };
-
-  const handleSelectImage = async () => {
-    try {
-      // For Android latest version
-      if (Platform.OS === 'android' && Platform.Version < 33) {
-        const hasPermission = await requestStoragePermission();
-        if (!hasPermission) {
-          Alert.alert(
-            'Permission Required', 
-            'Storage permission is required to select images. Please grant permission in Settings.',
-            [
-              { text: 'Cancel', style: 'cancel' },
-              { text: 'Open Settings', onPress: () => {
-                // Open app settings
-                if (Platform.OS === 'android') {
-                  const { Linking } = require('react-native');
-                  Linking.openSettings();
-                }
-              }}
-            ]
-          );
-          return;
-        }
-      }
-
-      const result = await launchImageLibrary({
-        mediaType: 'photo',
-        quality: 0.8,
-        includeBase64: false,
-        selectionLimit: 10 - images.length,
-      });
-
-      if (!result.didCancel && result.assets) {
-        const newImages = result.assets.map(asset => ({
-          uri: asset.uri,
-          type: asset.type || 'image/jpeg',
-          name: asset.fileName || 'image.jpg',
-        }));
-        setImages(prev => [...prev, ...newImages]);
-      }
-    } catch (error) {
-      console.error('Image picker error:', error);
-      Alert.alert('Error', 'Failed to select image. Please try again.');
-    }
-  };
-
-  const removeImage = (index) => {
-    setImages(prev => prev.filter((_, i) => i !== index));
-  };
-
   const handleUpdatePost = async () => {
-    if (!content.trim() && images.length === 0) {
-      Alert.alert('Error', 'Please add some content or images to your post.');
+    if (!content.trim()) {
+      Alert.alert('Error', 'Please add some content to your post.');
       return;
     }
 
@@ -178,7 +37,6 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
     try {
       const postData = {
         content: content.trim(),
-        images: images,
       };
 
       console.log('Updating post:', { postId: post._id || post.id, postData });
@@ -192,8 +50,8 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
           onPostUpdated(result.payload.post);
         }
       } else if (updatePostAsync.rejected.match(result)) {
-        console.log(' Update failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Failed to update post';
+        console.log(' Update failed:', result.payload);
+        const errorMessage = typeof result.payload === 'string' ? result.payload : 'Failed to update post';
         Alert.alert('Error', errorMessage);
       }
     } catch (error) {
@@ -211,15 +69,7 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
           <Icon name="arrow-left" size={20} color={colors.text} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Edit Post</Text>
-        <TouchableOpacity 
-          style={[styles.saveButton, (!content.trim() && images.length === 0) && styles.saveButtonDisabled]}
-          onPress={handleUpdatePost}
-          disabled={isLoading || (!content.trim() && images.length === 0)}
-        >
-          <Text style={[styles.saveButtonText, (!content.trim() && images.length === 0) && styles.saveButtonTextDisabled]}>
-            {isLoading ? 'Updating...' : 'Save'}
-          </Text>
-        </TouchableOpacity>
+        <View style={{ width: 40 }} />
       </View>
 
       <ScrollView style={styles.content}>
@@ -234,48 +84,33 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
           textAlignVertical="top"
         />
 
-        {/* Image Preview */}
-        {images.length > 0 && (
+        {/* Image Preview - Read Only */}
+        {post?.images && post.images.length > 0 && (
           <View style={styles.imagePreviewContainer}>
-            <Text style={styles.imagePreviewTitle}>Images ({images.length}/10)</Text>
+            <Text style={styles.imagePreviewTitle}>Images ({post.images.length})</Text>
+         
             <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagePreview}>
-              {images.map((image, index) => (
-                <View key={index} style={styles.imagePreviewItem}>
-                  <Image source={{ uri: image.uri }} style={styles.imagePreviewImage} />
-                  <TouchableOpacity
-                    style={styles.removeImageButton}
-                    onPress={() => removeImage(index)}
-                  >
-                    <Icon name="times" size={16} color="white" />
-                  </TouchableOpacity>
-                </View>
-              ))}
+              {post.images.map((imageUri, index) => {
+                // post.images is an array of URL strings
+                if (!imageUri || typeof imageUri !== 'string') return null;
+                return (
+                  <View key={index} style={styles.imagePreviewItem}>
+                    <Image source={{ uri: imageUri }} style={styles.imagePreviewImage} />
+                  </View>
+                );
+              })}
             </ScrollView>
-          </View>
-        )}
-
-        {/* Add Image Buttons */}
-        {images.length < 10 && (
-          <View style={styles.addImageContainer}>
-            <TouchableOpacity style={styles.addImageButton} onPress={handleTakePhoto}>
-              <Icon name="camera" size={24} color={colors.primary} />
-              <Text style={styles.addImageText}>Take Photo</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.addImageButton} onPress={handleSelectImage}>
-              <Icon name="image" size={24} color={colors.primary} />
-              <Text style={styles.addImageText}>Select Image</Text>
-            </TouchableOpacity>
           </View>
         )}
 
       
         <View style={styles.bottomSaveContainer}>
           <TouchableOpacity 
-            style={[styles.bottomSaveButton, (!content.trim() && images.length === 0) && styles.bottomSaveButtonDisabled]}
+            style={[styles.bottomSaveButton, !content.trim() && styles.bottomSaveButtonDisabled]}
             onPress={handleUpdatePost}
-            disabled={isLoading || (!content.trim() && images.length === 0)}
+            disabled={isLoading || !content.trim()}
           >
-            <Text style={[styles.bottomSaveButtonText, (!content.trim() && images.length === 0) && styles.bottomSaveButtonTextDisabled]}>
+            <Text style={[styles.bottomSaveButtonText, !content.trim() && styles.bottomSaveButtonTextDisabled]}>
               {isLoading ? 'Updating...' : 'Save Changes'}
             </Text>
           </TouchableOpacity>
@@ -308,25 +143,6 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text,
   },
-  saveButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 8,
-    minHeight: 36,
-  },
-  saveButtonDisabled: {
-    backgroundColor: colors.border,
-  },
-  saveButtonText: {
-    color: 'white',
-    fontSize: 14,
-    fontWeight: '600',
-    textAlign: 'center',
-  },
-  saveButtonTextDisabled: {
-    color: colors.textLight,
-  },
   content: {
     flex: 1,
     padding: 16,
@@ -347,7 +163,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
+    marginBottom: 4,
+  },
+  imagePreviewNote: {
+    fontSize: 12,
+    color: colors.muted,
     marginBottom: 8,
+    fontStyle: 'italic',
   },
   imagePreview: {
     flexDirection: 'row',
@@ -361,46 +183,17 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 8,
   },
-  removeImageButton: {
-    position: 'absolute',
-    top: -8,
-    right: -8,
-    backgroundColor: colors.error,
-    borderRadius: 12,
-    width: 24,
-    height: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addImageContainer: {
-    flexDirection: 'row',
-    justifyContent: 'space-around',
-    marginTop: 16,
-  },
-  addImageButton: {
-    alignItems: 'center',
-    padding: 16,
-    backgroundColor: colors.surface,
-    borderRadius: 12,
-    minWidth: 120,
-  },
-  addImageText: {
-    marginTop: 8,
-    fontSize: 14,
-    color: colors.text,
-    fontWeight: '500',
-  },
   bottomSaveContainer: {
     marginTop: 24,
     marginBottom: 32,
     paddingHorizontal: 16,
   },
   bottomSaveButton: {
-    backgroundColor: colors.primary,
+    backgroundColor: colors.pink,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: colors.primary,
+    shadowColor: colors.pink,
     shadowOffset: {
       width: 0,
       height: 2,

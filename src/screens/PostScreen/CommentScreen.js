@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
   Image, Alert, KeyboardAvoidingView, Platform, RefreshControl,
-  Modal
+  Modal, Keyboard
 } from 'react-native';
 import { FlashList } from '@shopify/flash-list';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -39,6 +39,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   const [repliesCursorById, setRepliesCursorById] = useState({});
   const [repliesLoadingMore, setRepliesLoadingMore] = useState({});
   const loadingMoreRef = useRef(false);
+  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // State for Edit Comment Modal
   const [isEditModalVisible, setEditModalVisible] = useState(false);
@@ -214,6 +215,27 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   const onRefresh = useCallback(async () => { setRefreshing(true); try { await loadInitial(); } finally { setRefreshing(false); } }, [loadInitial]);
 
   useEffect(() => { if (postId) { loadInitial(); } }, [postId, loadInitial]);
+
+  // Handle keyboard show/hide
+  useEffect(() => {
+    const keyboardWillShow = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
+      (e) => {
+        setKeyboardHeight(e.endCoordinates.height);
+      }
+    );
+    const keyboardWillHide = Keyboard.addListener(
+      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
+      () => {
+        setKeyboardHeight(0);
+      }
+    );
+
+    return () => {
+      keyboardWillShow.remove();
+      keyboardWillHide.remove();
+    };
+  }, []);
 
 
   // handleSend function
@@ -610,7 +632,11 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
 
   return (
     <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : undefined} keyboardVerticalOffset={Platform.OS === 'ios' ? 8 : 0}>
+      <KeyboardAvoidingView 
+        style={{ flex: 1 }} 
+        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onBack} hitSlop={8}>
             <Icon name="chevron-left" size={22} color={colors.text} />
@@ -623,13 +649,14 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
           data={comments}
           keyExtractor={(item, index) => getId(item) || String(index)}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: 88 }}
+          contentContainerStyle={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 100 }}
           ListFooterComponent={cursor ? <Text style={styles.footerLoading}>Loading…</Text> : null}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           onEndReachedThreshold={0.3}
           onEndReached={loadMore}
           showsVerticalScrollIndicator={false}
           estimatedItemSize={72}
+          keyboardShouldPersistTaps="handled"
         />
 
         {/* Edit Comment Modal */}
@@ -661,7 +688,11 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
           </View>
         </Modal>
 
-        <View style={[styles.composer, replyTo && styles.composerReply]}>
+        <View style={[
+          styles.composer, 
+          replyTo && styles.composerReply,
+          { bottom: keyboardHeight > 0 ? keyboardHeight : 0 }
+        ]}>
           {replyTo ? (
             <View style={styles.replyPill}>
               <Text numberOfLines={1} style={styles.replyPillText}>Replying to {replyTo.user?.fullName || replyTo.user?.userName}</Text>
@@ -683,6 +714,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
               maxLength={1000}
               returnKeyType={'send'}
               onSubmitEditing={handleSend}
+              blurOnSubmit={false}
             />
             <TouchableOpacity onPress={handleSend} disabled={!input.trim()} style={[styles.postBtn, !input.trim() && { opacity: 0.5 }]}>
               <Text style={styles.postBtnTxt}>Post</Text>
