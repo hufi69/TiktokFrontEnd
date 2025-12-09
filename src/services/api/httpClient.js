@@ -105,8 +105,16 @@ export const putRequest = (url, data, config = { ...jsonRequestHeaders }) =>
 export const patchRequest = (url, data, config = { ...jsonRequestHeaders }) =>
   httpClient.patch(url, data, config);
 
-export const deleteRequest = (url, config = { ...jsonRequestHeaders }) =>
-  httpClient.delete(url, config);
+export const deleteRequest = (url, data = null, config = { ...jsonRequestHeaders }) => {
+  
+  if (data) {
+    return httpClient.delete(url, {
+      ...config,
+      data: data
+    });
+  }
+  return httpClient.delete(url, config);
+};
 
 // Form Data Methods
 export const getFormDataRequest = (url, params = {}, config = { ...formDataRequestHeaders }) =>

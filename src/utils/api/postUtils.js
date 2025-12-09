@@ -50,7 +50,10 @@ export const transformPost = (raw, userId) => {
     _id: raw._id,                        
     content: raw?.content,
     media: raw?.media,
-    author: raw?.author,
+    author: {
+      ...raw?.author,
+      occupation: raw?.author?.occupation || null
+    },
     createdAt: raw?.createdAt,
     updatedAt: raw?.updatedAt
   };

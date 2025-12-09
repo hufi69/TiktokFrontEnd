@@ -1,4 +1,4 @@
-import React, { useRef, useState } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { 
   View, 
   Text, 
@@ -17,8 +17,9 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import BackButton from '../../components/common/BackButton';
 import AuthInput from '../AuthScreen/components/AuthInput';
 import { colors } from '../../constants/theme';
+import { API_CONFIG } from '../../config/api';
 
-const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, onEditCountry }) => {
+const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, isSignupFlow = false, onEditCountry }) => {
   // Helper function to format date for display (extract YYYY-MM-DD from ISO or keep YYYY-MM-DD)
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return '';
@@ -48,15 +49,83 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
     return dateStr;
   };
 
-  const [profileImage, setProfileImage] = useState(userData?.profilePicture ? { uri: userData.profilePicture } : null);
+  // Helper to get profile image URI
+  const getProfileImageUri = (profilePicture) => {
+    if (!profilePicture) return null;
+    // If it's already a URI (starts with http or file://), use it directly
+    if (typeof profilePicture === 'string' && (profilePicture.startsWith('http') || profilePicture.startsWith('file://'))) {
+      return { uri: profilePicture };
+    }
+    // If it's an object with uri, use it
+    if (typeof profilePicture === 'object' && profilePicture.uri) {
+      return profilePicture;
+    }
+    // If it's just a filename, construct the full URL
+    if (typeof profilePicture === 'string') {
+      return { uri: `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}` };
+    }
+    return null;
+  };
+
+  // Helper to parse phone number
+  const parsePhoneNumber = (phoneStr) => {
+    if (!phoneStr) return { countryCode: '+1', number: '' };
+    // Format: "+1 (123) 456-7890" or "+1 1234567890"
+    const match = phoneStr.match(/^(\+\d+)\s*(.+)$/);
+    if (match) {
+      const code = match[1];
+      const number = match[2].replace(/\D/g, ''); // Remove all non-digits
+      return { countryCode: code, number };
+    }
+    // If no country code, assume +1
+    return { countryCode: '+1', number: phoneStr.replace(/\D/g, '') };
+  };
+
+  const [profileImage, setProfileImage] = useState(() => {
+    if (isEditMode && userData?.profilePicture) {
+      return getProfileImageUri(userData.profilePicture);
+    }
+    return null;
+  });
   const [fullName, setFullName] = useState(userData?.fullName || '');
   const [username, setUsername] = useState(userData?.userName || '');
   const [dateOfBirth, setDateOfBirth] = useState(formatDateForDisplay(userData?.dateOfBirth));
+  // Email should be auto-filled from signup and read-only during signup flow only
   const [email, setEmail] = useState(userData?.email || '');
-  const [phoneNumber, setPhoneNumber] = useState(userData?.phoneNumber || '');
-  const [countryCode, setCountryCode] = useState('+1');
+  
+  // Auto-fill email if it's signup flow and email is provided
+  useEffect(() => {
+    if (isSignupFlow && userData?.email) {
+      setEmail(userData.email);
+    } else if (isEditMode && userData?.email) {
+      setEmail(userData.email);
+    }
+  }, [isSignupFlow, isEditMode, userData?.email]);
+
+  // Parse phone number when loading in edit mode
+  const parsedPhone = parsePhoneNumber(userData?.phone || userData?.phoneNumber);
+  const [phoneNumber, setPhoneNumber] = useState(parsedPhone.number);
+  const [countryCode, setCountryCode] = useState(parsedPhone.countryCode);
   const [occupation, setOccupation] = useState(userData?.occupation || '');
   const [focusedField, setFocusedField] = useState(null);
+
+  // Update profile image when userData changes (for edit mode)
+  useEffect(() => {
+    if (isEditMode && userData?.profilePicture) {
+      const imageUri = getProfileImageUri(userData.profilePicture);
+      setProfileImage(imageUri);
+    }
+  }, [isEditMode, userData?.profilePicture]);
+
+  // Update phone number when userData changes
+  useEffect(() => {
+    const phone = userData?.phone || userData?.phoneNumber;
+    if (phone) {
+      const parsed = parsePhoneNumber(phone);
+      setPhoneNumber(parsed.number);
+      setCountryCode(parsed.countryCode);
+    }
+  }, [userData?.phone, userData?.phoneNumber]);
 
   // Refs for input navigation
   const usernameRef = useRef(null);
@@ -223,6 +292,38 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
   const handleDateChange = (text) => {
     // Date formatting YYYY-MM-DD
     let cleaned = text.replace(/\D/g, '');
+    
+    // Limit year to 4 digits
+    if (cleaned.length > 4) {
+      const year = cleaned.substring(0, 4);
+      const month = cleaned.substring(4, 6);
+      const day = cleaned.substring(6, 8);
+      
+      // Validate month (01-12)
+      let validMonth = month;
+      if (month.length === 2) {
+        const monthNum = parseInt(month, 10);
+        if (monthNum > 12) {
+          validMonth = '12';
+        } else if (monthNum < 1) {
+          validMonth = '01';
+        }
+      }
+      
+      // Validate day (01-31)
+      let validDay = day;
+      if (day.length === 2) {
+        const dayNum = parseInt(day, 10);
+        if (dayNum > 31) {
+          validDay = '31';
+        } else if (dayNum < 1) {
+          validDay = '01';
+        }
+      }
+      
+      cleaned = year + validMonth + validDay;
+    }
+    
     if (cleaned.length >= 4) {
       cleaned = cleaned.substring(0, 4) + '-' + cleaned.substring(4);
     }
@@ -315,15 +416,18 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
               icon="envelope"
               placeholder="Enter your email address"
               value={email}
-              onChangeText={setEmail}
-              onFocus={() => setFocusedField('email')}
+              onChangeText={undefined}
+              editable={false}
+              onFocus={() => setFocusedField(null)}
               onBlur={() => setFocusedField(null)}
-              focused={focusedField === 'email'}
+              focused={false}
               keyboardType="email-address"
               autoCapitalize="none"
               returnKeyType="next"
               onSubmitEditing={() => phoneRef.current?.focus()}
               blurOnSubmit={false}
+              style={styles.emailReadOnly}
+              inputStyle={styles.emailReadOnlyInput}
             />
 
             <View style={styles.phoneContainer}>
@@ -389,7 +493,7 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, o
               username,
               dateOfBirth,
               email,
-              phoneNumber: `${countryCode} ${formatPhoneNumber(phoneNumber)}`,
+              phone: `${countryCode} ${formatPhoneNumber(phoneNumber)}`,
               occupation
             })}
             disabled={!isFormValid}
@@ -551,6 +655,13 @@ const styles = StyleSheet.create({
     fontSize: 16,
     color: colors.text,
     fontWeight: '500',
+  },
+  emailReadOnly: {
+    opacity: 0.7,
+    backgroundColor: '#F5F5F5',
+  },
+  emailReadOnlyInput: {
+    color: colors.muted,
   },
 });
 

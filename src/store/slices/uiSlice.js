@@ -5,6 +5,7 @@ const initialState = {
   currentScreen: 'splash',
   activeTab: 'home',
   selectedUserId: null,
+  selectedChatUser: null, // user data for chat screen
   followSomeoneSource: null, // tracking user caming from profile or after edit screen 
 
   isLoading: false,
@@ -52,6 +53,9 @@ const uiSlice = createSlice({
     },
     setSelectedUserId: (state, action) => {
       state.selectedUserId = action.payload;
+    },
+    setSelectedChatUser: (state, action) => {
+      state.selectedChatUser = action.payload;
     },
     setFollowSomeoneSource: (state, action) => {
       state.followSomeoneSource = action.payload;
@@ -133,6 +137,8 @@ const uiSlice = createSlice({
     resetUI: (state) => {
       state.currentScreen = 'splash';
       state.activeTab = 'home';
+      state.selectedUserId = null;
+      state.selectedChatUser = null;
       state.isLoading = false;
       state.loadingMessage = '';
       state.showStoryViewer = false;
@@ -154,6 +160,7 @@ export const {
   setCurrentScreen,
   setActiveTab,
   setSelectedUserId,
+  setSelectedChatUser,
   setFollowSomeoneSource,
   setLoading,
   setLoadingMessage,

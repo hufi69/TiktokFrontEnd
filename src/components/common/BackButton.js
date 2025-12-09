@@ -3,7 +3,13 @@ import { TouchableOpacity, View, StyleSheet } from 'react-native';
 import { colors } from '../../constants/theme';
 
 const BackButton = ({ onPress, style, accessibilityLabel = 'Go back' }) => (
-  <TouchableOpacity style={[styles.back, style]} onPress={onPress} accessibilityLabel={accessibilityLabel}>
+  <TouchableOpacity 
+    style={[styles.back, style]} 
+    onPress={onPress} 
+    accessibilityLabel={accessibilityLabel}
+    hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+    activeOpacity={0.7}
+  >
     <View style={styles.chevron} />
   </TouchableOpacity>
 );
@@ -16,7 +22,8 @@ const styles = StyleSheet.create({
     borderColor: colors.border,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.bg, 
+    backgroundColor: colors.bg,
+    zIndex: 1,
   },
   chevron: {
     width: 10,

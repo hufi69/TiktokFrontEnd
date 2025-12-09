@@ -15,51 +15,76 @@ import BackButton from '../../components/common/BackButton';
 import { colors } from '../../constants/theme';
 import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
 import { fetchAllUsers, followUser, unfollowUser } from '../../store/slices/userSlice';
+import { CONFIG } from '../../config';
 
 // Default avatar for users without profile picture
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
 
-const UserItem = ({ user, onToggleFollow, loading, onUserPress }) => (
-  <View style={styles.userItem}>
-    <TouchableOpacity 
-      style={styles.userInfo} 
-      onPress={() => onUserPress(user)}
-      activeOpacity={0.7}
-    >
-      <Image 
-        source={{ uri: user.profilePicture || DEFAULT_AVATAR }} 
-        style={styles.avatar} 
-      />
-      <View style={styles.userDetails}>
-        <Text style={styles.userName}>{user.fullName || user.userName || 'Unknown User'}</Text>
-        <Text style={styles.userOccupation}>{user.occupation || 'No occupation'}</Text>
-      </View>
-    </TouchableOpacity>
-    
-    <TouchableOpacity
-      style={[
-        styles.followButton,
-        user.isFollowing && styles.followingButton,
-        loading && styles.disabledButton
-      ]}
-      onPress={() => onToggleFollow(user._id)}
-      disabled={loading}
-    >
-      <Text style={[
-        styles.followButtonText,
-        user.isFollowing && styles.followingButtonText
-      ]}>
-        {loading ? '...' : (user.isFollowing ? 'Following' : 'Follow')}
-      </Text>
-    </TouchableOpacity>
-  </View>
-);
+// Helper function to get full profile picture URL
+const getAvatarUrl = (profilePicture) => {
+  if (!profilePicture) return DEFAULT_AVATAR;
+  // If it's already a full URL (starts with http), use it directly
+  if (/^https?:\/\//.test(profilePicture)) {
+    return profilePicture;
+  }
+  // Otherwise, construct the full URL with base URL
+  return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
+};
+
+const UserItem = ({ user, onToggleFollow, loading, onUserPress }) => {
+  // Determine if this specific user is being processed
+  const isProcessing = loading && user._id;
+  const isMutual = user.isMutual || (user.isFollowing && user.followsMe);
+  
+  return (
+    <View style={styles.userItem}>
+      <TouchableOpacity 
+        style={styles.userInfo} 
+        onPress={() => onUserPress(user)}
+        activeOpacity={0.7}
+      >
+        <Image 
+          source={{ uri: getAvatarUrl(user.profilePicture) }} 
+          style={styles.avatar} 
+        />
+        <View style={styles.userDetails}>
+          <View style={styles.userNameRow}>
+            <Text style={styles.userName}>{user.fullName || user.userName || 'Unknown User'}</Text>
+            {isMutual && (
+              <Text style={styles.mutualText}>mutual</Text>
+            )}
+          </View>
+          <Text style={styles.userOccupation}>{user.occupation || 'No occupation'}</Text>
+        </View>
+      </TouchableOpacity>
+      
+      <TouchableOpacity
+        style={[
+          styles.followButton,
+          user.isFollowing && styles.followingButton,
+          isProcessing && styles.disabledButton
+        ]}
+        onPress={() => onToggleFollow(user._id)}
+        disabled={isProcessing}
+        activeOpacity={0.7}
+      >
+        <Text style={[
+          styles.followButtonText,
+          user.isFollowing && styles.followingButtonText
+        ]}>
+          {isProcessing ? '...' : (user.isFollowing ? 'Following' : 'Follow')}
+        </Text>
+      </TouchableOpacity>
+    </View>
+  );
+};
 
 const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { allUsers, isLoading } = useAppSelector(state => state.user);
   const { user: currentUser } = useAppSelector(state => state.auth);
   const [searchQuery, setSearchQuery] = useState('');
+  const [processingUserId, setProcessingUserId] = useState(null);
 
   useEffect(() => {
     dispatch(fetchAllUsers());
@@ -68,8 +93,25 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
   const handleToggleFollow = async (userId) => {
     try {
       console.log(' Toggle follow started for user:', userId);
-      const user = allUsers.find(u => u._id === userId);
-      console.log(' User to toggle:', user);
+      const userIdStr = userId?.toString();
+      
+      // Set processing state for this specific user
+      setProcessingUserId(userIdStr);
+      
+      // Use string comparison for consistency
+      const user = allUsers.find(u => u._id?.toString() === userIdStr);
+      console.log(' User to toggle:', { 
+        found: !!user, 
+        userId: userIdStr, 
+        userIsFollowing: user?.isFollowing,
+        userData: user ? { id: user._id, name: user.fullName || user.userName } : null
+      });
+      
+      if (!user) {
+        Alert.alert('Error', 'User not found');
+        setProcessingUserId(null);
+        return;
+      }
       
       if (user.isFollowing) {
         console.log(' Unfollowing user...');
@@ -82,14 +124,30 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
       }
     } catch (error) {
       console.error(' Follow/Unfollow error:', error);
-      Alert.alert('Error', error.message || 'Failed to update follow status');
+      const errorMessage = error.message || 'Failed to update follow status';
+      
+      // Handle duplicate follow error specifically
+      if (errorMessage.toLowerCase().includes('duplicate') || 
+          errorMessage.toLowerCase().includes('already')) {
+        Alert.alert('Already Following', 'You are already following this user.');
+        // Refresh the users list to update the button state
+        dispatch(fetchAllUsers());
+      } else {
+        Alert.alert('Error', errorMessage);
+      }
+    } finally {
+      // Clear processing state
+      setProcessingUserId(null);
     }
   };
 
   const filteredUsers = allUsers
     .filter(user => {
       // Filter out current user - don't show yourself in follow suggestions
-      if (user._id === currentUser?._id || user._id === currentUser?.id) {
+      // Use string comparison for consistency
+      const userIdStr = user._id?.toString();
+      const currentUserIdStr = currentUser?._id?.toString() || currentUser?.id?.toString();
+      if (userIdStr === currentUserIdStr) {
         return false;
       }
 
@@ -154,7 +212,7 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
               <UserItem 
                 user={item} 
                 onToggleFollow={handleToggleFollow} 
-                loading={isLoading}
+                loading={processingUserId === item._id?.toString()}
                 onUserPress={handleUserPress}
               />
             )}
@@ -246,11 +304,21 @@ const styles = StyleSheet.create({
   userDetails: {
     flex: 1,
   },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   userName: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 2,
+    marginRight: 8,
+  },
+  mutualText: {
+    fontSize: 12,
+    color: colors.muted,
+    fontStyle: 'italic',
   },
   userOccupation: {
     fontSize: 14,

@@ -49,7 +49,7 @@ const CreateNewPasswordScreen = ({ onBack, onContinue, resetOTP }) => {
       }));
       
       if (resetPassword.fulfilled.match(result)) {
-        Alert.alert('Success', 'Password reset successfully!');
+        // Don't show alert here - the success modal will be shown after onContinue
         onContinue?.();
       } else if (resetPassword.rejected.match(result)) {
         const errorMessage = typeof result.payload === 'string' ? result.payload : 'Failed to reset password';
@@ -100,7 +100,7 @@ const CreateNewPasswordScreen = ({ onBack, onContinue, resetOTP }) => {
             </View>
             <TextInput
               style={styles.input}
-              placeholder="Password"
+              placeholder="New Password"
               placeholderTextColor="#C1C1C1"
               secureTextEntry={secure1}
               value={p1}
@@ -121,7 +121,7 @@ const CreateNewPasswordScreen = ({ onBack, onContinue, resetOTP }) => {
             <TextInput
               ref={p2Ref}
               style={styles.input}
-              placeholder="Password"
+              placeholder="Confirm New Password"
               placeholderTextColor="#C1C1C1"
               secureTextEntry={secure2}
               value={p2}

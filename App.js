@@ -22,10 +22,13 @@ import FollowSomeoneScreen from './src/screens/profile/FollowSomeoneScreen';
 import CountrySelectScreen from './src/screens/CountrySelectScreen';
 import OtpVerificationScreen from './src/screens/auth/OtpVerificationScreen';
 import FullHomeScreen from './src/screens/HomeScreen/FullHomeScreen';
+import ActivityScreen from './src/screens/ActivityScreen';
+import InboxScreen from './src/screens/InboxScreen';
+import ChatScreen from './src/screens/ChatScreen';
 
 
 import { useAppDispatch, useCurrentScreen, useAuthLoading, useAuthError, useAppSelector } from './src/hooks/hooks';
-import { setCurrentScreen, setSelectedUserId, setFollowSomeoneSource } from './src/store/slices/uiSlice';
+import { setCurrentScreen, setSelectedUserId, setSelectedChatUser, setFollowSomeoneSource } from './src/store/slices/uiSlice';
 import { loginUser, signupUser, updateUserCountry, loadStoredAuth, verifyOTP, verifyResetPasswordOTP, verifyToken, logoutUser, googleLogin } from './src/store/slices/authSlice';
 import { updateUserProfile } from './src/store/slices/userSlice';
 import { updateCommentCount } from './src/store/slices/postsSlice';
@@ -38,39 +41,58 @@ import EditPostScreen from './src/screens/PostScreen/EditPostScreen';
 function AppContent() {
   const dispatch = useAppDispatch();
   const currentScreen = useCurrentScreen();
-  const { selectedUserId } = useAppSelector(state => state.ui);
+  const { selectedUserId, selectedChatUser } = useAppSelector(state => state.ui);
   const authLoading = useAuthLoading();
   const authError = useAuthError();
   const user = useAppSelector((state) => state.auth.user);
+  const isTokenVerified = useAppSelector((state) => state.auth.isTokenVerified);
+  
+  // Track if auth initialization is complete
+  const [isInitializing, setIsInitializing] = useState(true);
 
   // Load stored authentication 
   useEffect(() => {
     const initializeAuth = async () => {
-     
-      dispatch(setCurrentScreen('splash'))
+      // Always start with splash screen
+      dispatch(setCurrentScreen('splash'));
+      setIsInitializing(true);
       
-      await new Promise(resolve => setTimeout(resolve, 2000));
-      await dispatch(loadStoredAuth());
+      // Show splash screen for 3-4 seconds
+      await new Promise(resolve => setTimeout(resolve, 3500));
+      
+      // Load stored auth (this will check token expiration)
+      const loadResult = await dispatch(loadStoredAuth());
       
       const token = await getAuthToken();
       console.log('Token check:', { hasToken: !!token, tokenLength: token?.length });
-      if (token) {
-        try {
-          const result = await dispatch(verifyToken());
-          if (verifyToken.fulfilled.match(result)) {
-            console.log(' Token verified, user is authenticated');
-            dispatch(setCurrentScreen('home'));
+      
+      if (token && loadStoredAuth.fulfilled.match(loadResult) && loadResult.payload) {
+        // We have a valid token (not expired) and user data
+        // Navigate to home immediately - backend verification can happen in background
+        console.log('✅ Valid token and user found, navigating to home');
+        dispatch(setCurrentScreen('home'));
+        
+        // Verify token with backend in background (non-blocking)
+        // If verification fails, we'll handle it gracefully without redirecting
+        dispatch(verifyToken()).then((result) => {
+          if (verifyToken.rejected.match(result)) {
+            console.log('⚠️ Backend token verification failed, but keeping user logged in (token not expired locally)');
+            // Don't redirect - token is still valid locally, just backend check failed
+            // This could be due to network issues or backend being down
           } else {
-            console.log(' Token invalid, redirecting to onboarding');
-            dispatch(setCurrentScreen('onboarding'));
+            console.log('✅ Backend token verification successful');
           }
-        } catch (error) {
-          console.log('################# Token verification failed:', error);
-          dispatch(setCurrentScreen('onboarding'));
-        }
+        }).catch((error) => {
+          console.log('⚠️ Token verification error (non-critical):', error);
+          // Don't redirect on error - token is still valid locally
+        });
       } else {
+        console.log('❌ No valid token found, redirecting to onboarding');
         dispatch(setCurrentScreen('onboarding'));
       }
+      
+      // Mark initialization as complete
+      setIsInitializing(false);
     };
     
     initializeAuth();
@@ -363,16 +385,25 @@ function AppContent() {
       
       if (updateUserProfile.fulfilled.match(result)) {
         console.log('Profile updated successfully!');
+        Alert.alert('Success', 'Profile updated successfully!');
         setProfileRefreshTrigger(prev => prev + 1);
         dispatch(setCurrentScreen('profile'));
       } else if (updateUserProfile.rejected.match(result)) {
-        console.log(' Profile update failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Profile update failed';
-        alert('Profile update failed: ' + errorMessage);
+        console.log(' Profile update failed:', result.payload);
+        // Extract error message from payload
+        let errorMessage = 'Profile update failed';
+        if (typeof result.payload === 'string') {
+          errorMessage = result.payload;
+        } else if (result.payload?.message) {
+          errorMessage = result.payload.message;
+        } else if (result.error?.message) {
+          errorMessage = result.error.message;
+        }
+        Alert.alert('Error', errorMessage);
       }
     } catch (error) {
       console.error(' Profile update error:', error);
-      alert('Profile update error: ' + error.message);
+      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
     }
   };
 
@@ -444,13 +475,21 @@ function AppContent() {
         // After profile completion, go to follow someone screen
         dispatch(setCurrentScreen('followSomeone'));
       } else if (updateUserProfile.rejected.match(result)) {
-        console.log(' Profile update failed:', result.error);
-        const errorMessage = typeof result.error === 'string' ? result.error : 'Profile update failed';
-        alert('Profile update failed: ' + errorMessage);
+        console.log(' Profile update failed:', result.payload);
+        // Extract error message from payload
+        let errorMessage = 'Profile update failed';
+        if (typeof result.payload === 'string') {
+          errorMessage = result.payload;
+        } else if (result.payload?.message) {
+          errorMessage = result.payload.message;
+        } else if (result.error?.message) {
+          errorMessage = result.error.message;
+        }
+        Alert.alert('Error', errorMessage);
       }
     } catch (error) {
       console.error(' Profile update error:', error);
-      alert('Profile update error: ' + error.message);
+      Alert.alert('Error', error.message || 'Failed to update profile. Please try again.');
     }
   };
 
@@ -587,7 +626,8 @@ function AppContent() {
   const renderCurrentScreen = () => {
     switch (currentScreen) {
       case 'splash':
-        return <SplashScreen onFinish={handleSplashFinish} />;
+        // Only allow auto-navigation if we're not initializing (manual splash screen access)
+        return <SplashScreen onFinish={handleSplashFinish} shouldAutoNavigate={!isInitializing} />;
       case 'onboarding': {
         const slideTranslateX = onboardingSlideAnim.interpolate({
           inputRange: [0, 1],
@@ -839,10 +879,14 @@ function AppContent() {
           />
         );
       case 'fillProfile':
+        // Get email from signupEmail state or from user object (after OTP verification)
+        const userEmail = signupEmail || user?.email || '';
         return (
           <FillProfileScreen
             onBack={handleBackToCountrySelect}
             onContinue={handleFillProfileContinue}
+            userData={{ email: userEmail }}
+            isSignupFlow={true}
           />
         );
       case 'editProfile':
@@ -882,12 +926,61 @@ function AppContent() {
             onSettings={handleProfileSettings}
             onCreatePost={handleCreatePost}
             onFollowSomeone={handleProfileFollowSomeone}
+            onUserProfilePress={handleUserProfilePress}
             route={{ params: { userId: selectedUserId } }}
             refreshTrigger={profileRefreshTrigger}
           />
         );
       case 'home':
-                      return <FullHomeScreen onLogout={handleLogout} onProfilePress={handleProfilePress} onCreatePost={handleCreatePost} onViewComments={handleViewComments} onEditPost={handleEditPost} onPostUpdated={handlePostUpdated} />;
+        return (
+          <FullHomeScreen 
+            onLogout={handleLogout} 
+            onProfilePress={handleProfilePress} 
+            onCreatePost={handleCreatePost} 
+            onViewComments={handleViewComments} 
+            onEditPost={handleEditPost} 
+            onPostUpdated={handlePostUpdated}
+            onActivityPress={() => dispatch(setCurrentScreen('activity'))}
+            onInboxPress={() => dispatch(setCurrentScreen('inbox'))}
+            onUserProfilePress={handleUserProfilePress}
+          />
+        );
+      case 'activity':
+        return (
+          <ActivityScreen
+            onBack={() => dispatch(setCurrentScreen('home'))}
+            onUserPress={handleUserProfilePress}
+            onFollowPress={(userId, isFollowing) => {
+              // Handle follow/unfollow - can be implemented later with backend
+              console.log('Follow toggle:', userId, isFollowing);
+            }}
+          />
+        );
+      case 'inbox':
+        return (
+          <InboxScreen
+            onBack={() => dispatch(setCurrentScreen('home'))}
+            onUserPress={handleUserProfilePress}
+            onMessagePress={(message) => {
+              dispatch(setSelectedChatUser(message.user));
+              dispatch(setCurrentScreen('chat'));
+            }}
+            onCreateMessage={() => {
+              // Handle create message - can be implemented later
+              console.log('Create message pressed');
+            }}
+          />
+        );
+      case 'chat':
+        return (
+          <ChatScreen
+            onBack={() => {
+              dispatch(setSelectedChatUser(null));
+              dispatch(setCurrentScreen('inbox'));
+            }}
+            user={selectedChatUser}
+          />
+        );
       default:
         return <SplashScreen onFinish={handleSplashFinish} />;
     }
@@ -935,10 +1028,52 @@ function AppContent() {
     }
   };
 
+  // Safety check: Only redirect if we're on home screen but have no user AND no token
+  // This should rarely happen, but acts as a safety net
+  useEffect(() => {
+    // Only run this check once after initialization is complete
+    if (!isInitializing && currentScreen === 'home') {
+      // Small delay to ensure all state updates have completed
+      const checkTimer = setTimeout(() => {
+        if (!user) {
+          getAuthToken().then(token => {
+            if (!token) {
+              console.log('⚠️ Safety check: No user and no token found, redirecting to onboarding');
+              dispatch(setCurrentScreen('onboarding'));
+            } else {
+              console.log('⚠️ Safety check: Token exists but no user in state - this might be a state sync issue');
+              // Token exists but user not in state - try reloading auth
+              dispatch(loadStoredAuth());
+            }
+          });
+        } else {
+          console.log('✅ Safety check passed: User exists in state');
+        }
+      }, 500); // Small delay to avoid race conditions
+      
+      return () => clearTimeout(checkTimer);
+    }
+  }, [isInitializing, currentScreen, user, dispatch]);
+
+  // Prevent rendering screens until auth initialization is complete
+  // This fixes the issue where home screen flashes before redirecting to onboarding
+  const renderApp = () => {
+    // If still initializing, always show splash screen
+    // This prevents the home screen from flashing before auth check completes
+    // Pass shouldAutoNavigate=false to prevent SplashScreen from auto-navigating
+    // since we handle navigation in initializeAuth
+    if (isInitializing) {
+      return <SplashScreen onFinish={handleSplashFinish} shouldAutoNavigate={false} />;
+    }
+    
+    // After initialization, render the current screen
+    return renderCurrentScreen();
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      {renderCurrentScreen()}
+      {renderApp()}
     </SafeAreaView>
   );
 }

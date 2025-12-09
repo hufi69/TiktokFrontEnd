@@ -14,7 +14,7 @@ const ResetSuccessScreen = ({ onDone }) => {
         onRequestClose={onDone}
       >
         <View style={styles.modalOverlay}>
-          <View style={styles.card}>
+      <View style={styles.card}>
             {/* Success Icon with gradient effect */}
             <View style={styles.iconContainer}>
               <View style={styles.outerCircle}>
@@ -31,8 +31,8 @@ const ResetSuccessScreen = ({ onDone }) => {
               <View style={[styles.decorativeDot, styles.dot4]} />
             </View>
 
-            <Text style={styles.title}>Congratulations!</Text>
-            <Text style={styles.caption}>Your account is ready to use</Text>
+        <Text style={styles.title}>Congratulations!</Text>
+        <Text style={styles.caption}>Your account is ready to use</Text>
 
             <TouchableOpacity 
               style={styles.primaryButton} 
@@ -40,8 +40,8 @@ const ResetSuccessScreen = ({ onDone }) => {
               activeOpacity={0.8}
             >
               <Text style={styles.primaryText}>Go to Homepage</Text>
-            </TouchableOpacity>
-          </View>
+        </TouchableOpacity>
+      </View>
         </View>
       </Modal>
     </SafeAreaView>

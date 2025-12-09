@@ -25,7 +25,9 @@ const fetchPosts = createAsyncThunk(
           commentCount: rawPosts[0].commentCount,
           comments: Array.isArray(rawPosts[0].comments) ? `Array[${rawPosts[0].comments.length}]` : rawPosts[0].comments,
           totalComments: rawPosts[0].totalComments,
-          hasComments: !!(rawPosts[0].comments || rawPosts[0].commentsCount || rawPosts[0].commentCount)
+          hasComments: !!(rawPosts[0].comments || rawPosts[0].commentsCount || rawPosts[0].commentCount),
+          authorFields: rawPosts[0].author ? Object.keys(rawPosts[0].author) : [],
+          authorOccupation: rawPosts[0].author?.occupation
         });
       }
       
@@ -54,6 +56,7 @@ const fetchPosts = createAsyncThunk(
             userName: post.author?.userName || post.author?.username,
             fullName: post.author?.fullName || post.author?.name,
             profilePicture: post.author?.profilePicture || null,
+            occupation: post.author?.occupation || null,
             ...post.author
           }
         };
@@ -64,7 +67,8 @@ const fetchPosts = createAsyncThunk(
           likes: processedPost.likes,
           likedByMe: processedPost.likedByMe,
           preservedLikeState: shouldPreserveLikeState,
-          backendLikedByMe: post.likedByMe
+          backendLikedByMe: post.likedByMe,
+          authorOccupation: processedPost.author?.occupation
         });
 
         return processedPost;

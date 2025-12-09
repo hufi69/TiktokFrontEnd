@@ -12,14 +12,12 @@ import {
   fetchUserFollowers,
   fetchUserFollowing,
   fetchUserPosts,
-  getFollowersCount,
-  getFollowingCount,
   followUser,
-  unfollowUser
+  unfollowUser,
+  checkIsFollowing
 } from '../../store/slices/userSlice';
 import BackButton from '../../components/common/BackButton';
 
-// Default avatar
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
 
 
@@ -30,17 +28,19 @@ const getAvatarUrl = (profilePicture) => {
     : `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}`;
 };
 
-const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone }) => {
+const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone, isFollowing, isLoading }) => {
   const dispatch = useAppDispatch();
-  const { followersCount, followingCount, postsCount, isLoading } = useAppSelector(state => state.user);
+  const { postsCount, userPosts } = useAppSelector(state => state.user);
 
   useEffect(() => {
     if (user?._id) {
-      dispatch(getFollowersCount(user._id));
-      dispatch(getFollowingCount(user._id));
       dispatch(fetchUserPosts(user._id));
     }
   }, [user?._id, dispatch]);
+// followers and following of the user 
+  const followersCount = user?.followers ?? 0;
+  const followingCount = user?.following ?? 0;
+  const displayPostsCount = postsCount || userPosts?.length || 0;
 
   return (
     <View style={styles.header}>
@@ -59,15 +59,15 @@ const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollow
 
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{postsCount || 0}</Text>
+          <Text style={styles.statNumber}>{displayPostsCount}</Text>
           <Text style={styles.statLabel}>Posts</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{followersCount || 0}</Text>
+          <Text style={styles.statNumber}>{followersCount}</Text>
           <Text style={styles.statLabel}>Followers</Text>
         </View>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>{followingCount || 0}</Text>
+          <Text style={styles.statNumber}>{followingCount}</Text>
           <Text style={styles.statLabel}>Following</Text>
         </View>
       </View>
@@ -83,8 +83,22 @@ const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollow
             </TouchableOpacity>
           </>
         ) : (
-          <TouchableOpacity style={styles.followButton} onPress={onFollowToggle}>
-            <Text style={styles.followButtonText}>Follow</Text>
+          <TouchableOpacity 
+            style={[
+              styles.followButton,
+              isFollowing && styles.followingButton,
+              isLoading && styles.disabledButton
+            ]}
+            onPress={onFollowToggle}
+            disabled={isLoading}
+            activeOpacity={0.7}
+          >
+            <Text style={[
+              styles.followButtonText,
+              isFollowing && styles.followingButtonText
+            ]}>
+              {isLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+            </Text>
           </TouchableOpacity>
         )}
       </View>
@@ -138,7 +152,7 @@ const FollowButton = ({ userId, isFollowing, onToggleFollow, loading }) => {
   );
 };
 
-const UserListItem = ({ user, onPress, showFollowButton = false }) => {
+const UserListItem = ({ user, onPress, showFollowButton = false, isMutual = false }) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
 
@@ -153,7 +167,12 @@ const UserListItem = ({ user, onPress, showFollowButton = false }) => {
         style={styles.userListItemImage}
       />
       <View style={styles.userListItemInfo}>
-        <Text style={styles.userListItemName}>{user?.fullName || user?.userName}</Text>
+        <View style={styles.userNameRow}>
+          <Text style={styles.userListItemName}>{user?.fullName || user?.userName}</Text>
+          {isMutual && (
+            <Text style={styles.mutualText}>mutual</Text>
+          )}
+        </View>
         <Text style={styles.userListItemOccupation}>{user?.occupation || 'No occupation'}</Text>
       </View>
       {showFollowButton && (
@@ -203,6 +222,7 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
       renderItem={renderPostItem}
       numColumns={3}
       columnWrapperStyle={styles.postGridRow}
+      contentContainerStyle={styles.postGridContainer}
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
@@ -230,7 +250,7 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
   );
 };
 
-const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, onFollowSomeone, onCreatePost, refreshTrigger }) => {
+const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, onFollowSomeone, onCreatePost, refreshTrigger, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { user: currentUser } = useAppSelector(state => state.auth);
   const { 
@@ -244,9 +264,28 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   
   const [activeTab, setActiveTab] = useState('posts'); // posts, followers, following
   const [refreshing, setRefreshing] = useState(false);
-
+  const [isFollowingUser, setIsFollowingUser] = useState(false);
+  const [isFollowLoading, setIsFollowLoading] = useState(false);
   const userId = route?.params?.userId || currentUser?._id;
   const isOwnProfile = !route?.params?.userId || (userId === currentUser?._id);
+
+  const followingIds = new Set(
+    following.map(f => f._id?.toString()).filter(Boolean)
+  );
+  const followerIds = new Set(
+    followers.map(f => f._id?.toString()).filter(Boolean)
+  );  
+  // For followers list: mutual if profile owner also follows them back
+  const getIsMutualForFollower = (user) => {
+    const userIdStr = user._id?.toString();
+    return user.isMutual || (userIdStr && followingIds.has(userIdStr));
+  };
+
+  // For following list: mutual if they also follow the profile owner back
+  const getIsMutualForFollowing = (user) => {
+    const userIdStr = user._id?.toString();
+    return user.isMutual || (userIdStr && followerIds.has(userIdStr));
+  };
 
   
   useEffect(() => {
@@ -264,8 +303,25 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     if (userId) {
       console.log(' Fetching user profile for:', userId);
       dispatch(fetchUserProfile(userId));
+    
+      if (!isOwnProfile) {
+        dispatch(checkIsFollowing(userId)).then((result) => {
+          if (checkIsFollowing.fulfilled.match(result)) {
+            setIsFollowingUser(result.payload.isFollowing);
+          }
+        });
+      } else {
+        setIsFollowingUser(false);
+      }
     }
-  }, [userId, dispatch]);
+  }, [userId, dispatch, isOwnProfile]);
+
+
+  useEffect(() => {
+    if (viewedUser?.isFollowing !== undefined && !isOwnProfile) {
+      setIsFollowingUser(viewedUser.isFollowing);
+    }
+  }, [viewedUser?.isFollowing, isOwnProfile]);
 
   useEffect(() => {
     const refreshProfile = () => {
@@ -274,8 +330,6 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
         dispatch(fetchUserProfile(userId));
       }
     };
-
-   
     refreshProfile();
   }, [userId, dispatch]);
 
@@ -293,7 +347,12 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     }
   }, [refreshTrigger, userId, dispatch]);
 
-  // Debug logging
+  useEffect(() => {
+    if (!isOwnProfile && (activeTab === 'followers' || activeTab === 'following')) {
+      setActiveTab('posts');
+    }
+  }, [isOwnProfile, activeTab]);
+
   useEffect(() => {
     console.log(' ProfileScreen Debug:', {
       userId,
@@ -308,7 +367,6 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     });
   }, [userId, currentUser?._id, viewedUser?._id, isLoading, error, isOwnProfile, navigation, onBack, onFollowSomeone]);
 
-  // If no userId is available, show loading
   if (!userId) {
     console.log(' No userId available');
     return (
@@ -320,7 +378,6 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     );
   }
 
-  // Show loading only if we're actually loading and don't have user data yet
   if (isLoading && !viewedUser && !currentUser) {
     console.log(' Showing loading screen');
     return (
@@ -346,9 +403,9 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
         await dispatch(fetchUserProfile(userId)).unwrap();
         if (activeTab === 'posts') {
           await dispatch(fetchUserPosts(userId)).unwrap();
-        } else if (activeTab === 'followers') {
+        } else if (activeTab === 'followers' && isOwnProfile) {
           await dispatch(fetchUserFollowers(userId)).unwrap();
-        } else if (activeTab === 'following') {
+        } else if (activeTab === 'following' && isOwnProfile) {
           await dispatch(fetchUserFollowing(userId)).unwrap();
         }
       }
@@ -360,13 +417,17 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   };
 
   const handleTabPress = async (tab) => {
+    if ((tab === 'followers' || tab === 'following') && !isOwnProfile) {
+      return;
+    }
+    
     setActiveTab(tab);
     if (userId) {
       if (tab === 'posts') {
         await dispatch(fetchUserPosts(userId));
-      } else if (tab === 'followers') {
+      } else if (tab === 'followers' && isOwnProfile) {
         await dispatch(fetchUserFollowers(userId));
-      } else if (tab === 'following') {
+      } else if (tab === 'following' && isOwnProfile) {
         await dispatch(fetchUserFollowing(userId));
       }
     }
@@ -405,7 +466,9 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   const handleUserPress = (user) => {
     console.log(' User pressed:', user._id);
-    if (navigation && navigation.push) {
+    if (onUserProfilePress) {
+      onUserProfilePress(user);
+    } else if (navigation && navigation.push) {
       navigation.push('Profile', { userId: user._id });
     } else {
       console.log(' No navigation available for user press');
@@ -413,24 +476,28 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   };
 
   const handlePostPress = (post) => {
-    // Navigate to post detail or open post modal
     console.log('Post pressed:', post);
   };
 
   const handleFollowToggle = async () => {
     if (!userId || isOwnProfile) return;
     
+    setIsFollowLoading(true);
     try {
-      const isFollowing = viewedUser?.isFollowing || false;
-      if (isFollowing) {
+      if (isFollowingUser) {
         await dispatch(unfollowUser(userId)).unwrap();
+        setIsFollowingUser(false);
       } else {
         await dispatch(followUser(userId)).unwrap();
+        setIsFollowingUser(true);
       }
       
       await dispatch(fetchUserProfile(userId));
     } catch (error) {
       Alert.alert('Error', error.message || 'Failed to update follow status');
+      setIsFollowingUser(!isFollowingUser);
+    } finally {
+      setIsFollowLoading(false);
     }
   };
 
@@ -468,6 +535,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
                 user={item}
                 onPress={handleUserPress}
                 showFollowButton={!isOwnProfile}
+                isMutual={getIsMutualForFollower(item)}
               />
             )}
             refreshControl={
@@ -490,6 +558,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
                 user={item}
                 onPress={handleUserPress}
                 showFollowButton={!isOwnProfile}
+                isMutual={getIsMutualForFollowing(item)}
               />
             )}
             refreshControl={
@@ -518,7 +587,6 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     );
   }
 
-  // If no user data is available at all, show a fallback
   if (!viewedUser && !currentUser) {
     console.log(' No user data available');
     return (
@@ -535,7 +603,6 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
 
   return (
     <SafeAreaView style={styles.container}>
-      {/* Header with Back Button */}
       <View style={styles.headerContainer}>
         <BackButton onPress={handleBack} />
         <Text style={styles.headerTitle}>
@@ -551,6 +618,8 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
         isOwnProfile={isOwnProfile}
         onFollowToggle={handleFollowToggle}
         onFollowSomeone={handleFollowSomeone}
+        isFollowing={isFollowingUser}
+        isLoading={isFollowLoading}
       />
 
       <View style={styles.tabContainer}>
@@ -562,22 +631,26 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
             Posts
           </Text>
         </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'followers' && styles.activeTab]}
-          onPress={() => handleTabPress('followers')}
-        >
-          <Text style={[styles.tabText, activeTab === 'followers' && styles.activeTabText]}>
-            Followers
-          </Text>
-        </TouchableOpacity>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'following' && styles.activeTab]}
-          onPress={() => handleTabPress('following')}
-        >
-          <Text style={[styles.tabText, activeTab === 'following' && styles.activeTabText]}>
-            Following
-          </Text>
-        </TouchableOpacity>
+        {isOwnProfile && (
+          <>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'followers' && styles.activeTab]}
+              onPress={() => handleTabPress('followers')}
+            >
+              <Text style={[styles.tabText, activeTab === 'followers' && styles.activeTabText]}>
+                Followers
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.tab, activeTab === 'following' && styles.activeTab]}
+              onPress={() => handleTabPress('following')}
+            >
+              <Text style={[styles.tabText, activeTab === 'following' && styles.activeTabText]}>
+                Following
+              </Text>
+            </TouchableOpacity>
+          </>
+        )}
       </View>
 
       <View style={styles.contentContainer}>
@@ -734,11 +807,21 @@ const styles = StyleSheet.create({
   userListItemInfo: {
     flex: 1,
   },
+  userNameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 2,
+  },
   userListItemName: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
-    marginBottom: 2,
+    marginRight: 8,
+  },
+  mutualText: {
+    fontSize: 12,
+    color: colors.muted,
+    fontStyle: 'italic',
   },
   userListItemOccupation: {
     fontSize: 14,
@@ -823,11 +906,15 @@ const styles = StyleSheet.create({
     fontWeight: '600',
   },
   // Post Grid Styles
+  postGridContainer: {
+    padding: 0,
+  },
   postGridRow: {
-    justifyContent: 'space-between',
+    justifyContent: 'flex-start',
+    paddingHorizontal: 0,
   },
   postGridItem: {
-    width: '32%',
+    width: '33.33%',
     aspectRatio: 1,
     marginBottom: 2,
     position: 'relative',
@@ -880,15 +967,27 @@ const styles = StyleSheet.create({
   },
   followButton: {
     flex: 1,
-    backgroundColor: colors.primary,
+    backgroundColor: colors.pink,
     paddingVertical: 12,
     borderRadius: 8,
     alignItems: 'center',
+    minWidth: 100,
+  },
+  followingButton: {
+    backgroundColor: 'transparent',
+    borderWidth: 1,
+    borderColor: colors.pink,
   },
   followButtonText: {
     color: '#fff',
     fontSize: 14,
     fontWeight: '600',
+  },
+  followingButtonText: {
+    color: colors.pink,
+  },
+  disabledButton: {
+    opacity: 0.6,
   },
   followSomeoneContainer: {
     marginTop: 15,

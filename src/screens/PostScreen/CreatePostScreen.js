@@ -13,24 +13,26 @@ import { colors } from '../../constants/theme';
 const CreatePostScreen = ({ onBack, onPostCreated }) => {
   const dispatch = useAppDispatch();
   const [content, setContent] = useState('');
-  const [images, setImages] = useState([]);
+  const [media, setMedia] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleImagePicker = async (type) => {
+  const handleMediaPicker = async (type) => {
     try {
-      const remainingSlots = 5 - images.length;
+      const remainingSlots = 5 - media.length;
       if (remainingSlots <= 0) {
-        Alert.alert('Limit Reached', 'You can only add up to 5 images per post.');
+        Alert.alert('Limit Reached', 'You can only add up to 5 photos and videos per post.');
         return;
       }
 
       const options = {
-        mediaType: 'photo',
+        mediaType: 'mixed', 
         quality: 0.8,
         maxWidth: 1024,
         maxHeight: 1024,
-        multiple: true,
-        selectionLimit: remainingSlots,
+        videoQuality: 'high',
+        multiple: type === 'gallery',
+        selectionLimit: type === 'gallery' ? remainingSlots : 1,
+        saveToPhotos: false,
       };
 
       const result = type === 'camera' 
@@ -38,38 +40,39 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
         : await launchImageLibrary(options);
 
       if (result.assets && result.assets.length > 0) {
-        const imagesToAdd = result.assets.slice(0, remainingSlots);
-        const newImages = imagesToAdd.map(asset => ({
+        const mediaToAdd = result.assets.slice(0, remainingSlots);
+        const newMedia = mediaToAdd.map(asset => ({
           uri: asset.uri,
-          type: asset.type,
-          name: asset.fileName || `image_${Date.now()}.jpg`,
+          type: asset.type || (asset.uri?.includes('.mp4') || asset.uri?.includes('.mov') ? 'video/mp4' : 'image/jpeg'),
+          name: asset.fileName || (asset.type?.startsWith('video/') ? `video_${Date.now()}.mp4` : `image_${Date.now()}.jpg`),
+          isVideo: asset.type?.startsWith('video/') || asset.uri?.includes('.mp4') || asset.uri?.includes('.mov'),
         }));
-        setImages([...images, ...newImages]);
+        setMedia([...media, ...newMedia]);
         if (result.assets.length > remainingSlots) {
-          Alert.alert('Limit Reached', `Only ${remainingSlots} image(s) added. Maximum 5 images per post.`);
+          Alert.alert('Limit Reached', `Only ${remainingSlots} item(s) added. Maximum 5 photos and videos per post.`);
         }
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to pick image');
+      Alert.alert('Error', 'Failed to pick media');
     }
   };
 
-  const removeImage = (index) => {
-    setImages(images.filter((_, i) => i !== index));
+  const removeMedia = (index) => {
+    setMedia(media.filter((_, i) => i !== index));
   };
 
   const handleCreatePost = async () => {
-    if (!content.trim() && images.length === 0) {
-      Alert.alert('Error', 'Please add some content or images');
+    if (!content.trim() && media.length === 0) {
+      Alert.alert('Error', 'Please add some content or media');
       return;
     }
 
     setIsLoading(true);
     try {
-      console.log(' Creating post with:', { content: content.trim(), images: images.length });
+      console.log(' Creating post with:', { content: content.trim(), media: media.length });
       const result = await dispatch(createPost({
         content: content.trim(),
-        images: images
+        images: media // Keep as 'images' for backend compatibility, but it includes videos
       }));
       
       console.log(' Create post result:', result);
@@ -103,11 +106,11 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Create Post</Text>
           <TouchableOpacity 
-            style={[styles.postButton, (!content.trim() && images.length === 0) && styles.postButtonDisabled]}
+            style={[styles.postButton, (!content.trim() && media.length === 0) && styles.postButtonDisabled]}
             onPress={handleCreatePost}
-            disabled={isLoading || (!content.trim() && images.length === 0)}
+            disabled={isLoading || (!content.trim() && media.length === 0)}
           >
-            <Text style={[styles.postButtonText, (!content.trim() && images.length === 0) && styles.postButtonTextDisabled]}>
+            <Text style={[styles.postButtonText, (!content.trim() && media.length === 0) && styles.postButtonTextDisabled]}>
               {isLoading ? 'Posting...' : 'Post'}
             </Text>
           </TouchableOpacity>
@@ -124,14 +127,23 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
             textAlignVertical="top"
           />
 
-          {images.length > 0 && (
-            <View style={styles.imageGrid}>
-              {images.map((image, index) => (
-                <View key={index} style={styles.imageContainer}>
-                  <Image source={{ uri: image.uri }} style={styles.image} />
+          {media.length > 0 && (
+            <View style={styles.mediaGrid}>
+              {media.map((item, index) => (
+                <View key={index} style={styles.mediaContainer}>
+                  {item.isVideo ? (
+                    <View style={styles.videoContainer}>
+                      <Image source={{ uri: item.uri }} style={styles.mediaThumbnail} />
+                      <View style={styles.videoOverlay}>
+                        <Icon name="play-circle" size={32} color="white" />
+                      </View>
+                    </View>
+                  ) : (
+                    <Image source={{ uri: item.uri }} style={styles.mediaThumbnail} />
+                  )}
                   <TouchableOpacity 
-                    style={styles.removeImageButton}
-                    onPress={() => removeImage(index)}
+                    style={styles.removeMediaButton}
+                    onPress={() => removeMedia(index)}
                   >
                     <Icon name="times" size={16} color="white" />
                   </TouchableOpacity>
@@ -143,15 +155,15 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => handleImagePicker('gallery')}
+              onPress={() => handleMediaPicker('gallery')}
             >
               <Icon name="image" size={20} color={colors.primary} />
-              <Text style={styles.actionButtonText}>Photo</Text>
+              <Text style={styles.actionButtonText}>Photos & Videos</Text>
             </TouchableOpacity>
 
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => handleImagePicker('camera')}
+              onPress={() => handleMediaPicker('camera')}
             >
               <Icon name="camera" size={20} color={colors.primary} />
               <Text style={styles.actionButtonText}>Camera</Text>
@@ -211,23 +223,39 @@ const styles = StyleSheet.create({
     minHeight: 120,
     padding: 0,
   },
-  imageGrid: {
+  mediaGrid: {
     flexDirection: 'row',
     flexWrap: 'wrap',
     marginTop: 16,
     gap: 8,
   },
-  imageContainer: {
+  mediaContainer: {
     position: 'relative',
     width: 100,
     height: 100,
   },
-  image: {
+  mediaThumbnail: {
     width: '100%',
     height: '100%',
     borderRadius: 8,
   },
-  removeImageButton: {
+  videoContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0,0,0,0.3)',
+    borderRadius: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  removeMediaButton: {
     position: 'absolute',
     top: 4,
     right: 4,

@@ -27,7 +27,7 @@ import { StoryViewer } from '../StoryScreen/components';
 import { API_CONFIG } from '../../config/api';
 import { buildStories, insertNewStory } from '../../utils/api/postUtils';
 
-const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments, onEditPost, onPostUpdated }) => {
+const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments, onEditPost, onPostUpdated, onActivityPress, onInboxPress, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { posts: reduxPosts, isLoading } = useAppSelector(state => state.posts);
   const { user } = useAppSelector(state => state.auth);
@@ -157,85 +157,87 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
     }
   };
 
-  const handleStoryUpload = () => {
-    Alert.alert(
-      'Add Story',
-      'Choose how you want to add your story',
-      [
-        { text: 'Take Photo', onPress: openCameraForStory },
-        { text: 'Choose from Gallery', onPress: openGalleryForStory },
-        { text: 'Cancel', style: 'cancel' }
-      ]
-    );
-  };
+  // STORY UPLOAD CODE - COMMENTED OUT
+  // const handleStoryUpload = () => {
+  //   Alert.alert(
+  //     'Add Story',
+  //     'Choose how you want to add your story',
+  //     [
+  //       { text: 'Take Photo', onPress: openCameraForStory },
+  //       { text: 'Choose from Gallery', onPress: openGalleryForStory },
+  //       { text: 'Cancel', style: 'cancel' }
+  //     ]
+  //   );
+  // };
 
-  const openCameraForStory = async () => {
-    const hasPermission = await requestCameraPermission();
-    if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
-      return;
-    }
+  // const openCameraForStory = async () => {
+  //   const hasPermission = await requestCameraPermission();
+  //   if (!hasPermission) {
+  //     Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+  //     return;
+  //   }
 
-    const options = {
-      mediaType: 'photo',
-      quality: 0.8,
-      maxWidth: 1080,
-      maxHeight: 1920,
-      includeBase64: false,
-    };
+  //   const options = {
+  //     mediaType: 'photo',
+  //     quality: 0.8,
+  //     maxWidth: 1080,
+  //     maxHeight: 1920,
+  //     includeBase64: false,
+  //   };
 
-    launchCamera(options, (response) => {
-      if (response.didCancel || response.errorMessage) return;
-      if (response.assets && response.assets[0]) {
-        // Add new story to the beginning of stories array
-        const newStory = {
-          id: Date.now().toString(),
-          username: 'You',
-          avatar: response.assets[0].uri,
-          isYourStory: false,
-          hasStory: true,
-        };
-        setStories(prev => insertNewStory(prev, response.assets[0].uri));
-        Alert.alert('Success', 'Story added successfully!');
-      }
-    });
-  };
-//IGNORE THE STORIES CODE FOR NOW AS RIGHT NOW NOT USING IT
-  const openGalleryForStory = async () => {
-    const hasPermission = await requestStoragePermission();
-    if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Storage permission is required to select photos.');
-      return;
-    }
+  //   launchCamera(options, (response) => {
+  //     if (response.didCancel || response.errorMessage) return;
+  //     if (response.assets && response.assets[0]) {
+  //       // Add new story to the beginning of stories array
+  //       const newStory = {
+  //         id: Date.now().toString(),
+  //         username: 'You',
+  //         avatar: response.assets[0].uri,
+  //         isYourStory: false,
+  //         hasStory: true,
+  //       };
+  //       setStories(prev => insertNewStory(prev, response.assets[0].uri));
+  //       Alert.alert('Success', 'Story added successfully!');
+  //     }
+  //   });
+  // };
 
-    const options = {
-      mediaType: 'photo',
-      quality: 0.8,
-      maxWidth: 1080,
-      maxHeight: 1920,
-      includeBase64: false,
-    };
+  // const openGalleryForStory = async () => {
+  //   const hasPermission = await requestStoragePermission();
+  //   if (!hasPermission) {
+  //     Alert.alert('Permission Denied', 'Storage permission is required to select photos.');
+  //     return;
+  //   }
 
-    launchImageLibrary(options, (response) => {
-      if (response.didCancel || response.errorMessage) return;
-      if (response.assets && response.assets[0]) {
-        const newStory = {
-          id: Date.now().toString(),
-          username: 'You',
-          avatar: response.assets[0].uri,
-          isYourStory: false,
-          hasStory: true,
-        };
-        setStories(prev => insertNewStory(prev, response.assets[0].uri));
-        Alert.alert('Success', 'Story added successfully!');
-      }
-    });
-  };
+  //   const options = {
+  //     mediaType: 'photo',
+  //     quality: 0.8,
+  //     maxWidth: 1080,
+  //     maxHeight: 1920,
+  //     includeBase64: false,
+  //   };
+
+  //   launchImageLibrary(options, (response) => {
+  //     if (response.didCancel || response.errorMessage) return;
+  //     if (response.assets && response.assets[0]) {
+  //       const newStory = {
+  //         id: Date.now().toString(),
+  //         username: 'You',
+  //         avatar: response.assets[0].uri,
+  //         isYourStory: false,
+  //         hasStory: true,
+  //       };
+  //       setStories(prev => insertNewStory(prev, response.assets[0].uri));
+  //       Alert.alert('Success', 'Story added successfully!');
+  //     }
+  //   });
+  // };
 
   const handleStoryPress = useCallback((story) => {
-    if (story.isYourStory) {
-      handleStoryUpload();
-    } else {
+    // STORY UPLOAD CODE - COMMENTED OUT
+    // if (story.isYourStory) {
+    //   handleStoryUpload();
+    // } else {
       // Check if the story has actual story content
       if (story.stories && story.stories.length > 0) {
         const viewableStories = stories.filter(s => !s.isYourStory && s.stories && s.stories.length > 0);
@@ -244,10 +246,9 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
           setCurrentStoryIndex(storyIndex);
           setShowStoryViewer(true);
         }
-      } else {
-        Alert.alert('No Stories', 'This user has no stories to view.');
       }
-    }
+      // No alert shown - just do nothing if no stories
+    // }
   }, [stories]);
 
   const handleLike = useCallback(async (postId) => {
@@ -410,9 +411,11 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
   }, [dispatch]);
 
   const handleUserPress = useCallback((user) => {
-    console.log('User pressed:', user.username);
-   
-  }, []);
+    console.log('User pressed from post:', user?._id || user?.id);
+    if (onUserProfilePress && user) {
+      onUserProfilePress(user);
+    }
+  }, [onUserProfilePress]);
 
     const handleTabPress = useCallback((tabId) => {
     setActiveTab(tabId);
@@ -421,8 +424,10 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
       onProfilePress();
     } else if (tabId === 'create' && onCreatePost) {
       onCreatePost();
+    } else if (tabId === 'inbox' && onInboxPress) {
+      onInboxPress();
     }
-  }, [onProfilePress, onCreatePost]);
+  }, [onProfilePress, onCreatePost, onInboxPress]);
 
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
@@ -436,11 +441,11 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
       <View style={styles.header}>
         <Text style={styles.appTitle}>TokTok</Text>
         <View style={styles.headerActions}>
-          <TouchableOpacity style={styles.headerButton}>
+          <TouchableOpacity 
+            style={styles.headerButton}
+            onPress={() => onActivityPress?.()}
+          >
             <Icon name="heart-o" size={24} color={colors.text} />
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.headerButton}>
-            <Icon name="send-o" size={24} color={colors.text} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerButton}

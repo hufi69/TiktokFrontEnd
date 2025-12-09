@@ -29,44 +29,45 @@ export const fetchStories = createAsyncThunk(
   }
 );
 
-export const uploadStory = createAsyncThunk(
-  'stories/uploadStory',
-  async (storyData, { getState, rejectWithValue }) => {
-    try {
-      const { token } = getState().auth;
-      
-      const formData = new FormData();
-      formData.append('image', {
-        uri: storyData.image.uri,
-        type: storyData.image.type || 'image/jpeg',
-        name: 'story.jpg',
-      });
+// STORY UPLOAD CODE - COMMENTED OUT
+// export const uploadStory = createAsyncThunk(
+//   'stories/uploadStory',
+//   async (storyData, { getState, rejectWithValue }) => {
+//     try {
+//       const { token } = getState().auth;
+//       
+//       const formData = new FormData();
+//       formData.append('image', {
+//         uri: storyData.image.uri,
+//         type: storyData.image.type || 'image/jpeg',
+//         name: 'story.jpg',
+//       });
 
-      if (storyData.caption) {
-        formData.append('caption', storyData.caption);
-      }
+//       if (storyData.caption) {
+//         formData.append('caption', storyData.caption);
+//       }
 
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.STORIES), {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${token}`,
-          'Content-Type': 'multipart/form-data',
-        },
-        body: formData,
-      });
+//       const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.STORIES), {
+//         method: 'POST',
+//         headers: {
+//           'Authorization': `Bearer ${token}`,
+//           'Content-Type': 'multipart/form-data',
+//         },
+//         body: formData,
+//       });
 
-      const data = await response.json();
+//       const data = await response.json();
 
-      if (!response.ok) {
-        return rejectWithValue(data.message || 'Failed to upload story');
-      }
+//       if (!response.ok) {
+//         return rejectWithValue(data.message || 'Failed to upload story');
+//       }
 
-      return data.story;
-    } catch (error) {
-      return rejectWithValue(error.message);
-    }
-  }
-);
+//       return data.story;
+//     } catch (error) {
+//       return rejectWithValue(error.message);
+//     }
+//   }
+// );
 
 export const likeStory = createAsyncThunk(
   'stories/likeStory',
@@ -225,21 +226,22 @@ const storiesSlice = createSlice({
         state.error = action.payload;
       });
 
+    // STORY UPLOAD CODE - COMMENTED OUT
     // Upload Story
-    builder
-      .addCase(uploadStory.pending, (state) => {
-        state.isLoading = true;
-        state.error = null;
-      })
-      .addCase(uploadStory.fulfilled, (state, action) => {
-        state.isLoading = false;
-        state.myStories.unshift(action.payload);
-        state.error = null;
-      })
-      .addCase(uploadStory.rejected, (state, action) => {
-        state.isLoading = false;
-        state.error = action.payload;
-      });
+    // builder
+    //   .addCase(uploadStory.pending, (state) => {
+    //     state.isLoading = true;
+    //     state.error = null;
+    //   })
+    //   .addCase(uploadStory.fulfilled, (state, action) => {
+    //     state.isLoading = false;
+    //     state.myStories.unshift(action.payload);
+    //     state.error = null;
+    //   })
+    //   .addCase(uploadStory.rejected, (state, action) => {
+    //     state.isLoading = false;
+    //     state.error = action.payload;
+    //   });
 
     // Like Story
     builder

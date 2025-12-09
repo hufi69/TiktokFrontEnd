@@ -5,7 +5,7 @@ import {
   StyleSheet,
 } from 'react-native';
 
-const SplashScreen = ({ onFinish }) => {
+const SplashScreen = ({ onFinish, shouldAutoNavigate = true }) => {
   const [logoScale] = useState(new Animated.Value(0.8));
   const [logoOpacity] = useState(new Animated.Value(0));
   const [decorativeOpacity] = useState(new Animated.Value(0));
@@ -34,11 +34,16 @@ const SplashScreen = ({ onFinish }) => {
       useNativeDriver: true,
     }).start();
 
-    // Auto navigate to onboarding after 3 seconds
-    setTimeout(() => {
-      onFinish();
-    }, 3000);
-  }, [onFinish]);
+    // Only auto navigate if shouldAutoNavigate is true
+    // This prevents navigation when app initialization has already handled navigation
+    if (shouldAutoNavigate) {
+      const timer = setTimeout(() => {
+        onFinish();
+      }, 3000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [onFinish, shouldAutoNavigate]);
 
   return (
     <View style={styles.content}>

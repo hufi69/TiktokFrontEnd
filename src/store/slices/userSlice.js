@@ -246,17 +246,24 @@ export const checkIsFollowing = createAsyncThunk(
   'user/checkIsFollowing',
   async (userId, { getState, rejectWithValue }) => {
     try {
-      const { token } = getState().auth;
-      // Derive following list and check membership
-      const response = await fetch(buildUrl(API_CONFIG.ENDPOINTS.ALL_FOLLOWING), {
-        method: 'GET',
-        headers: { 'Authorization': `Bearer ${token}`, 'Content-Type': 'application/json' },
-      });
-      const data = await response.json();
-      if (!response.ok) return rejectWithValue(data.message || 'Failed to fetch following');
+      // Use the followApi instead of direct fetch for consistency
+      const data = await followApi.getFollowing();
       const raw = data.following || data.data || [];
-      const normalize = (obj) => obj?.following?._id || obj?.following || obj?._id;
-      const isFollowing = raw.some(f => normalize(f) === userId);
+      
+      // Backend returns Follow documents with populated 'following' field
+      // Extract user ID from the populated 'following' field
+      const normalize = (followDoc) => {
+        if (followDoc?.following?._id) {
+          return followDoc.following._id.toString();
+        }
+        if (followDoc?.following) {
+          return followDoc.following.toString();
+        }
+        return followDoc?._id?.toString();
+      };
+      
+      const userIdStr = userId?.toString();
+      const isFollowing = raw.some(f => normalize(f) === userIdStr);
       return { userId, isFollowing };
     } catch (error) {
       return rejectWithValue(error.message);
@@ -270,11 +277,89 @@ export const fetchAllUsers = createAsyncThunk(
     try {
       console.log('Fetching all users');
       
-      const data = await userApi.getAllUsers();
-      console.log('Fetch users response:', data);
+      // Fetch all users, following list, and followers list in parallel
+      const [usersData, followingData, followersData] = await Promise.all([
+        userApi.getAllUsers(),
+        followApi.getFollowing().catch(() => ({ following: [] })), 
+        followApi.getFollowers().catch(() => ({ followers: [] })) 
+      ]);
+      
+      console.log('Fetch users response:', usersData);
+      console.log('Fetch following response:', followingData);
+      console.log('Fetch followers response:', followersData);
 
-      console.log('Fetch users successful:', data.data);
-      return data.data || [];
+      const users = usersData.data || [];
+      const rawFollowing = followingData.following || followingData.data || [];
+      const rawFollowers = followersData.followers || followersData.data || [];
+      
+      const normalizeFollowing = (followDoc) => {
+      
+        if (followDoc?.following?._id) {
+          return followDoc.following._id;
+        }
+        // If following is just an ObjectId
+        if (followDoc?.following) {
+          return followDoc.following;
+        }
+        return followDoc?._id;
+      };
+      
+      const normalizeFollower = (followDoc) => {
+        // If follower is populated (object), get its _id
+        if (followDoc?.follower?._id) {
+          return followDoc.follower._id;
+        }
+        // If follower is just an ObjectId
+        if (followDoc?.follower) {
+          return followDoc.follower;
+        }
+        return followDoc?._id;
+      };
+      
+      // Create Sets of followed and follower user IDs 
+      const followingIds = new Set(
+        rawFollowing
+          .map(f => {
+            const userId = normalizeFollowing(f);
+            return userId ? userId.toString() : null;
+          })
+          .filter(Boolean)
+      );
+
+      const followerIds = new Set(
+        rawFollowers
+          .map(f => {
+            const userId = normalizeFollower(f);
+            return userId ? userId.toString() : null;
+          })
+          .filter(Boolean)
+      );
+
+      console.log('Following IDs set:', Array.from(followingIds));
+      console.log('Follower IDs set:', Array.from(followerIds));
+
+      // Add isFollowing and followsMe properties to each user
+      const usersWithFollowingStatus = users.map(user => {
+        const userStrId = user._id?.toString();
+        const isFollowing = followingIds.has(userStrId);
+        const followsMe = followerIds.has(userStrId);
+        return {
+          ...user,
+          isFollowing: isFollowing,
+          followsMe: followsMe,
+          isMutual: isFollowing && followsMe 
+        };
+      });
+
+      console.log('Users with following status (first 3):', usersWithFollowingStatus.slice(0, 3).map(u => ({ 
+        id: u._id, 
+        name: u.fullName || u.userName, 
+        isFollowing: u.isFollowing,
+        followsMe: u.followsMe,
+        isMutual: u.isMutual
+      })));
+      
+      return usersWithFollowingStatus;
     } catch (error) {
       console.error('Fetch users error:', error);
       return rejectWithValue(error.message || 'Failed to fetch users');
@@ -369,16 +454,20 @@ const userSlice = createSlice({
       .addCase(followUser.fulfilled, (state, action) => {
         state.isLoading = false;
         const { userId, isFollowing } = action.payload;
+        const userIdStr = userId?.toString();
         
-        // Update in allUsers array
-        const userIndex = state.allUsers.findIndex(user => user._id === userId);
+        // Update in allUsers array - use string comparison for consistency
+        const userIndex = state.allUsers.findIndex(user => user._id?.toString() === userIdStr);
         if (userIndex !== -1) {
           state.allUsers[userIndex].isFollowing = isFollowing;
+          // Update isMutual: true only if both follow each other
+          state.allUsers[userIndex].isMutual = isFollowing && (state.allUsers[userIndex].followsMe || false);
         }
         
         // Update in viewedUser if exists
-        if (state.viewedUser && state.viewedUser._id === userId) {
+        if (state.viewedUser && state.viewedUser._id?.toString() === userIdStr) {
           state.viewedUser.isFollowing = isFollowing;
+          state.viewedUser.isMutual = isFollowing && (state.viewedUser.followsMe || false);
           state.viewedUser.followersCount = isFollowing 
             ? (state.viewedUser.followersCount || 0) + 1 
             : Math.max(0, (state.viewedUser.followersCount || 0) - 1);
@@ -399,16 +488,20 @@ const userSlice = createSlice({
       .addCase(unfollowUser.fulfilled, (state, action) => {
         state.isLoading = false;
         const { userId, isFollowing } = action.payload;
+        const userIdStr = userId?.toString();
         
-        // Update in allUsers array
-        const userIndex = state.allUsers.findIndex(user => user._id === userId);
+        // Update in allUsers array - use string comparison for consistency
+        const userIndex = state.allUsers.findIndex(user => user._id?.toString() === userIdStr);
         if (userIndex !== -1) {
           state.allUsers[userIndex].isFollowing = isFollowing;
+          // When unfollowing, isMutual becomes false (since isFollowing is now false)
+          state.allUsers[userIndex].isMutual = false;
         }
         
         // Update in viewedUser if exists
-        if (state.viewedUser && state.viewedUser._id === userId) {
+        if (state.viewedUser && state.viewedUser._id?.toString() === userIdStr) {
           state.viewedUser.isFollowing = isFollowing;
+          state.viewedUser.isMutual = false;
           state.viewedUser.followersCount = isFollowing 
             ? (state.viewedUser.followersCount || 0) + 1 
             : Math.max(0, (state.viewedUser.followersCount || 0) - 1);
@@ -504,8 +597,9 @@ const userSlice = createSlice({
     builder
       .addCase(checkIsFollowing.fulfilled, (state, action) => {
         const { userId, isFollowing } = action.payload;
-        // Update in allUsers array
-        const userIndex = state.allUsers.findIndex(user => user._id === userId);
+        const userIdStr = userId?.toString();
+        // Update in allUsers array - use string comparison for consistency
+        const userIndex = state.allUsers.findIndex(user => user._id?.toString() === userIdStr);
         if (userIndex !== -1) {
           state.allUsers[userIndex].isFollowing = isFollowing;
         }

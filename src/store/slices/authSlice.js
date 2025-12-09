@@ -9,7 +9,14 @@ import {
   removeUserData,
   storeCountryData,
   getCountryData,
-  removeCountryData
+  removeCountryData,
+  storeRememberMe,
+  getRememberMe,
+  removeRememberMe,
+  storeTokenTimestamp,
+  getTokenTimestamp,
+  removeTokenTimestamp,
+  isTokenValid
 } from '../../utils/helpers/storage';
 import { updateUserProfile } from './userSlice';
 import * as authApi from '../../services/api/authApi';
@@ -33,8 +40,13 @@ export const loginUser = createAsyncThunk(
       });
 
       // Store token and user data in AsyncStorage
+      // Always save token (with or without remember me)
       if (data.token) {
         await storeAuthToken(data.token);
+        // Store remember me flag and token timestamp
+        const rememberMe = credentials.remember || false;
+        await storeRememberMe(rememberMe);
+        await storeTokenTimestamp(Date.now());
       }
       if (data.user) {
         await storeUserData(data.user);
@@ -257,6 +269,8 @@ export const logoutUser = createAsyncThunk(
       // Clear AsyncStorage
       await removeAuthToken();
       await removeUserData();
+      await removeTokenTimestamp();
+      await removeRememberMe();
       await removeCountryData();
       
       console.log(' AsyncStorage cleared successfully');
@@ -283,8 +297,21 @@ export const loadStoredAuth = createAsyncThunk(
         countryData
       });
       
+      // Check if token exists and is still valid based on expiration
       if (token && userData) {
-        return { token, user: userData, countryData };
+        const tokenIsValid = await isTokenValid();
+        
+        if (tokenIsValid) {
+          console.log('Token is valid, loading auth data');
+          return { token, user: userData, countryData };
+        } else {
+          console.log('Token has expired, clearing auth data');
+          // Token expired, clear it
+          await removeAuthToken();
+          await removeUserData();
+          await removeTokenTimestamp();
+          return null;
+        }
       }
       
       return null;
@@ -320,6 +347,8 @@ const authSlice = createSlice({
       removeAuthToken();
       removeUserData();
       removeCountryData();
+      removeTokenTimestamp();
+      removeRememberMe();
     },
     clearError: (state) => {
       state.error = null;
@@ -477,12 +506,22 @@ const authSlice = createSlice({
           state.token = action.payload.token;
           state.countryData = action.payload.countryData;
           state.isAuthenticated = true;
+          // Don't set isTokenVerified here - it will be set after verifyToken completes
+          // This allows verifyToken to validate with backend
           console.log('Stored auth loaded successfully:', {
             user: action.payload.user?.email,
             hasCountry: !!action.payload.countryData,
             country: action.payload.countryData?.value
           });
         }
+      })
+      .addCase(loadStoredAuth.rejected, (state) => {
+        // If loadStoredAuth fails, clear everything
+        state.user = null;
+        state.token = null;
+        state.isAuthenticated = false;
+        state.isTokenVerified = false;
+        state.countryData = null;
       })
 
     // Logout User

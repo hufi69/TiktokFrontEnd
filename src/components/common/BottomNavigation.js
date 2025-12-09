@@ -8,7 +8,7 @@ const TABS = [
   { id: 'home',   icon: 'home',          label: 'Home' },
   { id: 'search', icon: 'search',        label: 'Search' },
   { id: 'create', icon: 'plus',          label: 'Create' },
-  { id: 'shorts', icon: 'play-circle-o', label: 'Shorts' },
+  { id: 'inbox', icon: 'paper-plane-o', label: 'Inbox' },
   { id: 'profile',icon: 'user-o',        label: 'Profile' },
 ];
 

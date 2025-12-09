@@ -20,6 +20,21 @@ import {
   togglePostLike,
   clearError
 } from '../../../store/slices/likesSlice';
+import { CONFIG } from '../../../config';
+
+// Default avatar for users without profile picture
+const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
+
+// Helper function to get full profile picture URL
+const getAvatarUrl = (profilePicture) => {
+  if (!profilePicture) return DEFAULT_AVATAR;
+  // If it's already a full URL (starts with http), use it directly
+  if (/^https?:\/\//.test(profilePicture)) {
+    return profilePicture;
+  }
+  // Otherwise, construct the full URL with base URL
+  return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
+};
 
 const PostItem = ({ post, onComment, onShare, onBookmark, onUserPress, onEdit, onDelete, currentUserId, onCommentCountUpdate }) => {
   const dispatch = useDispatch();
@@ -84,14 +99,16 @@ const PostItem = ({ post, onComment, onShare, onBookmark, onUserPress, onEdit, o
           disabled={pending}
         >
           <Image
-            source={{ uri: post.author?.profilePicture || 'https://via.placeholder.com/40' }}
+            source={{ uri: getAvatarUrl(post.author?.profilePicture) }}
             style={styles.avatar}
           />
           <View>
             <Text style={styles.username}>
-              {post.author?.userName || post.author?.fullName || 'Unknown User'}
+              {post.author?.userName || post.author?.fullName || post.user?.username || 'Unknown User'}
             </Text>
-            <Text style={styles.location}>{post.location || 'Unknown Location'}</Text>
+            <Text style={styles.location}>
+              {post.author?.occupation || post.user?.occupation || 'No occupation'}
+            </Text>
           </View>
         </TouchableOpacity>
         
@@ -187,15 +204,6 @@ const PostItem = ({ post, onComment, onShare, onBookmark, onUserPress, onEdit, o
       <Text style={styles.timestamp}>
         {new Date(post.createdAt).toLocaleDateString()}
       </Text>
-
-      {/* Loading indicator */}
-      {pending && (
-        <View style={styles.loadingIndicator}>
-          <Text style={styles.loadingText}>
-            Updating...
-          </Text>
-        </View>
-      )}
 
       {/* options Menu Modal */}
       <Modal
