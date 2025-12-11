@@ -166,11 +166,11 @@ const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) =
       <View style={styles.header}>
         <BackButton onPress={onBack} />
         <Text style={styles.title}>Inbox</Text>
-        <View style={styles.headerActions}>
+        {/* <View style={styles.headerActions}>
           <TouchableOpacity style={styles.headerButton}>
             <Icon name="ellipsis-v" size={20} color={colors.text} />
           </TouchableOpacity>
-        </View>
+        </View> */}
       </View>
 
       {/* Search Bar */}

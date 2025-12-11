@@ -22,7 +22,18 @@ import { useSelector } from 'react-redux';
 const AVATAR_FALLBACK = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=80&h=80&fit=crop&crop=face';
 const getId = (c) => (c?._id || c?.id);
 
-const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpdate }) => {
+// Helper function to get full profile picture URL
+const getAvatarUrl = (profilePicture) => {
+  if (!profilePicture) return AVATAR_FALLBACK;
+  // If it's already a full URL (starts with http), use it directly
+  if (/^https?:\/\//.test(profilePicture)) {
+    return profilePicture;
+  }
+  // Otherwise, construct the full URL with base URL
+  return `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}`;
+};
+
+const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpdate, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { user, token } = useAppSelector(state => state.auth);
   
@@ -402,23 +413,32 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     }
   }, [repliesCursorById, repliesLoadingMore, fetchReplies]);
 
-  // Separate component to avoid Rules of Hooks violation
-  const ReplyItem = React.memo(({ item: rep, comments, handleCommentLike, setReplyTo, inputRef, formatCount, timeAgo }) => {
+  const ReplyItem = React.memo(({ item: rep, comments, handleCommentLike, setReplyTo, inputRef, formatCount, timeAgo, onUserProfilePress }) => {
     const repId = getId(rep);
     const likeState = useSelector(selectCommentLike(repId));
     const pending = useSelector(selectLikePending(repId));
     const isLiked = likeState.isLiked;
     const likeCount = likeState.count;
     
+    const handleUserPress = () => {
+      if (onUserProfilePress && rep.user) {
+        onUserProfilePress(rep.user);
+      }
+    };
+    
     return (
       <View style={styles.replyRow}>
-        <Image 
-          source={{ uri: rep.user?.profilePicture || AVATAR_FALLBACK }} 
-          style={styles.avatarXs} 
-        />
+        <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+          <Image 
+            source={{ uri: getAvatarUrl(rep.user?.profilePicture) }} 
+            style={styles.avatarXs} 
+          />
+        </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={styles.replyHeader}>
-            <Text style={styles.name}>{rep.user?.fullName || rep.user?.userName}</Text>
+            <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+              <Text style={styles.name}>{rep.user?.fullName || rep.user?.userName}</Text>
+            </TouchableOpacity>
             <Text style={[styles.time, { marginLeft: 'auto' }]}>{timeAgo(rep.createdAt)}</Text>
           </View>
           <Text style={styles.replyText}>{rep.content}</Text>
@@ -474,6 +494,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
       inputRef={inputRef}
       formatCount={formatCount}
       timeAgo={timeAgo}
+      onUserProfilePress={onUserProfilePress}
     />
   );
 
@@ -494,7 +515,8 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     loadMoreReplies,
     repliesLoadingMore,
     openEditModal,
-    handleDeleteComment
+    handleDeleteComment,
+    onUserProfilePress
   }) => {
     const cid = getId(item);
     const likeState = useSelector(selectCommentLike(cid));
@@ -503,13 +525,23 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
     const likeCount = likeState.count;
     const isAuthor = item.user?._id === currentUser?._id;
 
+    const handleUserPress = () => {
+      if (onUserProfilePress && item.user) {
+        onUserProfilePress(item.user);
+      }
+    };
+
     return (
       <View style={styles.commentRow}>
-        <Image source={{ uri: item.user?.profilePicture || AVATAR_FALLBACK }} style={styles.avatarSm} />
+        <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+          <Image source={{ uri: getAvatarUrl(item.user?.profilePicture) }} style={styles.avatarSm} />
+        </TouchableOpacity>
         <View style={{ flex: 1 }}>
           <View style={styles.commentHeader}>
             <View style={{ flex: 1 }}>
-              <Text style={styles.name}>{item.user?.fullName || item.user?.userName}</Text>
+              <TouchableOpacity onPress={handleUserPress} activeOpacity={0.7}>
+                <Text style={styles.name}>{item.user?.fullName || item.user?.userName}</Text>
+              </TouchableOpacity>
             </View>
             <Text style={styles.time}>{timeAgo(item.createdAt)}</Text>
             {isAuthor && (
@@ -627,6 +659,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
       repliesLoadingMore={repliesLoadingMore}
       openEditModal={openEditModal}
       handleDeleteComment={handleDeleteComment}
+      onUserProfilePress={onUserProfilePress}
     />
   );
 

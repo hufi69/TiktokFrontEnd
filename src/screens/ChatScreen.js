@@ -17,6 +17,8 @@ import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import BackButton from '../components/common/BackButton';
 import { colors, spacing } from '../constants/theme';
 import { CONFIG } from '../config';
+import socketService from '../services/socket/socketService';
+import { useAppSelector } from '../hooks/hooks';
 
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
@@ -45,13 +47,89 @@ const generateMockChatMessages = (user) => {
 };
 
 const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
+  const currentUser = useAppSelector((state) => state.auth.user);
   const [messages, setMessages] = useState(
     initialMessages.length > 0 ? initialMessages : generateMockChatMessages(user)
   );
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
+  const [isTyping, setIsTyping] = useState(false);
+  const [otherUserTyping, setOtherUserTyping] = useState(false);
 
   const flatListRef = useRef(null);
+  const typingTimeoutRef = useRef(null);
+
+  // Generate room ID from user IDs (sorted to ensure consistency)
+  const getRoomId = () => {
+    if (!currentUser?._id || !user?._id) return null;
+    const userIds = [currentUser._id, user._id].sort();
+    return `chat_${userIds[0]}_${userIds[1]}`;
+  };
+
+  const roomId = getRoomId();
+
+  // Join room and setup socket listeners
+  useEffect(() => {
+    if (!roomId || !currentUser || !user) return;
+
+    // Join the chat room
+    socketService.joinRoom(roomId);
+
+    // Listen for new messages
+    const handleNewMessage = (data) => {
+      console.log('Received message:', data);
+      const isFromCurrentUser = data.senderId === currentUser._id;
+      
+      const newMessage = {
+        id: data.id || Date.now().toString(),
+        type: isFromCurrentUser ? 'sent' : 'received',
+        text: data.message || data.text || '',
+        image: data.image || null,
+        sender: isFromCurrentUser ? currentUser : user,
+        timestamp: data.timestamp 
+          ? new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+          : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+        date: data.date || 'Today',
+      };
+
+      setMessages((prev) => [...prev, newMessage]);
+    };
+
+    // Listen for typing indicators
+    const handleTyping = (data) => {
+      if (data.userId !== currentUser._id) {
+        setOtherUserTyping(data.isTyping);
+        if (data.isTyping) {
+          // Clear typing indicator after 3 seconds
+          setTimeout(() => setOtherUserTyping(false), 3000);
+        }
+      }
+    };
+
+    // Listen for message read receipts
+    const handleMessageRead = (data) => {
+      setMessages((prev) =>
+        prev.map((msg) =>
+          msg.id === data.messageId ? { ...msg, isRead: true } : msg
+        )
+      );
+    };
+
+    // Register socket listeners
+    socketService.on('new_message', handleNewMessage);
+    socketService.on('typing', handleTyping);
+    socketService.on('message_read', handleMessageRead);
+
+    // Cleanup on unmount
+    return () => {
+      socketService.off('new_message', handleNewMessage);
+      socketService.off('typing', handleTyping);
+      socketService.off('message_read', handleMessageRead);
+      if (roomId) {
+        socketService.leaveRoom(roomId);
+      }
+    };
+  }, [roomId, currentUser, user]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -79,22 +157,74 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
     });
   };
 
+  // Handle typing indicator
+  const handleTextChange = (text) => {
+    setInputText(text);
+    
+    if (!isTyping && text.trim().length > 0) {
+      setIsTyping(true);
+      socketService.sendTyping(roomId, true);
+    }
+
+    // Clear existing timeout
+    if (typingTimeoutRef.current) {
+      clearTimeout(typingTimeoutRef.current);
+    }
+
+    // Set new timeout to stop typing indicator
+    typingTimeoutRef.current = setTimeout(() => {
+      setIsTyping(false);
+      socketService.sendTyping(roomId, false);
+    }, 1000);
+  };
+
   const handleSend = () => {
     if (!inputText.trim() && !selectedImage) return;
+    if (!roomId) {
+      Alert.alert('Error', 'Unable to send message. Please try again.');
+      return;
+    }
 
+    const messageText = inputText.trim();
+    const messageImage = selectedImage?.uri || null;
+
+    // Optimistically add message to UI
+    const tempId = Date.now().toString();
     const now = new Date();
-    const newMessage = {
-      id: Date.now().toString(),
+    const optimisticMessage = {
+      id: tempId,
       type: 'sent',
-      text: inputText.trim(),
-      image: selectedImage?.uri || null,
+      text: messageText,
+      image: messageImage,
       timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       date: 'Today',
+      isSending: true,
     };
 
-    setMessages((prev) => [...prev, newMessage]);
+    setMessages((prev) => [...prev, optimisticMessage]);
     setInputText('');
     setSelectedImage(null);
+    setIsTyping(false);
+    socketService.sendTyping(roomId, false);
+
+    // Send message via socket
+    const success = socketService.sendMessage(roomId, messageText, messageImage);
+    
+    if (!success) {
+      // If socket send failed, show error and remove optimistic message
+      Alert.alert('Error', 'Failed to send message. Please check your connection.');
+      setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
+    } else {
+      // Update message to remove sending indicator when confirmed
+      // The server will send back the message with proper ID
+      setTimeout(() => {
+        setMessages((prev) =>
+          prev.map((msg) =>
+            msg.id === tempId ? { ...msg, isSending: false } : msg
+          )
+        );
+      }, 500);
+    }
   };
 
   const renderMessage = ({ item, index }) => {
@@ -185,6 +315,13 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
           >
             <Icon name="times" size={18} color={'#fff'} />
           </TouchableOpacity>
+        </View>
+      )}
+
+      {/* TYPING INDICATOR */}
+      {otherUserTyping && (
+        <View style={styles.typingIndicator}>
+          <Text style={styles.typingText}>{user?.userName || user?.fullName} is typing...</Text>
         </View>
       )}
 
@@ -352,5 +489,15 @@ const styles = StyleSheet.create({
   sendButtonDisabled: {
     backgroundColor: colors.muted,
     opacity: 0.5,
+  },
+  typingIndicator: {
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    backgroundColor: colors.bg,
+  },
+  typingText: {
+    fontSize: 12,
+    color: colors.muted,
+    fontStyle: 'italic',
   },
 });

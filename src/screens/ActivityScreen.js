@@ -15,8 +15,6 @@ import { CONFIG } from '../config';
 
 // Default avatar
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
-
-// Helper function to get full profile picture URL
 const getAvatarUrl = (profilePicture) => {
   if (!profilePicture) return DEFAULT_AVATAR;
   if (/^https?:\/\//.test(profilePicture)) {
@@ -189,11 +187,7 @@ const ActivityScreen = ({ onBack, onUserPress, onFollowPress }) => {
       <Text style={styles.sectionTitle}>{section.title}</Text>
       {section.activities.map((activity) => (
         <View key={activity.id} style={styles.activityItem}>
-          <TouchableOpacity
-            style={styles.userInfoRow}
-            onPress={() => onUserPress?.(activity.user)}
-            activeOpacity={0.7}
-          >
+          <View style={styles.userInfoRow}>
             <Image
               source={{ uri: getAvatarUrl(activity.user.profilePicture) }}
               style={styles.avatar}
@@ -206,7 +200,7 @@ const ActivityScreen = ({ onBack, onUserPress, onFollowPress }) => {
               </View>
               <Text style={styles.timestamp}>{activity.timestamp}</Text>
             </View>
-          </TouchableOpacity>
+          </View>
 
           {activity.type === 'follow' && (
             <TouchableOpacity

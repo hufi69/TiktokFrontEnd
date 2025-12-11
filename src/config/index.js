@@ -21,7 +21,6 @@ const pickLocalBaseUrl = () => {
     return 'http://10.0.2.2:8000';
   }
   
-
   return 'http://localhost:8000';
 };
 
@@ -33,6 +32,26 @@ const ENVIRONMENTS = {
   PRODUCTION: { API_BASE_URL: 'http://51.20.81.225', DEBUG: true },
 
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 const API_ENDPOINTS = {
   // Auth

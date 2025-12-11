@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import {
-  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Alert, RefreshControl
+  View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Alert, RefreshControl, Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -28,7 +28,7 @@ const getAvatarUrl = (profilePicture) => {
     : `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}`;
 };
 
-const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone, isFollowing, isLoading }) => {
+const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone, isFollowing, isLoading, onProfilePicturePress }) => {
   const dispatch = useAppDispatch();
   const { postsCount, userPosts } = useAppSelector(state => state.user);
 
@@ -45,10 +45,12 @@ const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollow
   return (
     <View style={styles.header}>
       <View style={styles.profileInfo}>
-        <Image
-          source={{ uri: getAvatarUrl(user?.profilePicture) }}
-          style={styles.profileImage}
-        />
+        <TouchableOpacity onPress={onProfilePicturePress} activeOpacity={0.8}>
+          <Image
+            source={{ uri: getAvatarUrl(user?.profilePicture) }}
+            style={styles.profileImage}
+          />
+        </TouchableOpacity>
         <View style={styles.profileDetails}>
           <Text style={styles.username}>{user?.userName || user?.fullName || 'Unknown User'}</Text>
           <Text style={styles.fullName}>{user?.fullName}</Text>
@@ -266,6 +268,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   const [refreshing, setRefreshing] = useState(false);
   const [isFollowingUser, setIsFollowingUser] = useState(false);
   const [isFollowLoading, setIsFollowLoading] = useState(false);
+  const [showImagePreview, setShowImagePreview] = useState(false);
   const userId = route?.params?.userId || currentUser?._id;
   const isOwnProfile = !route?.params?.userId || (userId === currentUser?._id);
 
@@ -620,6 +623,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
         onFollowSomeone={handleFollowSomeone}
         isFollowing={isFollowingUser}
         isLoading={isFollowLoading}
+        onProfilePicturePress={() => setShowImagePreview(true)}
       />
 
       <View style={styles.tabContainer}>
@@ -656,6 +660,36 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
       <View style={styles.contentContainer}>
         {renderContent()}
       </View>
+
+      {/* Profile Picture Preview Modal */}
+      <Modal
+        visible={showImagePreview}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowImagePreview(false)}
+      >
+        <View style={styles.modalContainer}>
+          <TouchableOpacity
+            style={styles.modalBackdrop}
+            activeOpacity={1}
+            onPress={() => setShowImagePreview(false)}
+          >
+            <View style={styles.modalContent}>
+              <TouchableOpacity
+                style={styles.closeButton}
+                onPress={() => setShowImagePreview(false)}
+              >
+                <Icon name="times" size={24} color="#fff" />
+              </TouchableOpacity>
+              <Image
+                source={{ uri: getAvatarUrl((viewedUser || currentUser)?.profilePicture) }}
+                style={styles.previewImage}
+                resizeMode="contain"
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -1008,6 +1042,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     fontWeight: '600',
     marginLeft: 8,
+  },
+  modalContainer: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.95)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalBackdrop: {
+    flex: 1,
+    width: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalContent: {
+    width: '100%',
+    height: '100%',
+    justifyContent: 'center',
+    alignItems: 'center',
+    position: 'relative',
+  },
+  closeButton: {
+    position: 'absolute',
+    top: 50,
+    right: 20,
+    zIndex: 10,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    borderRadius: 20,
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  previewImage: {
+    width: '90%',
+    height: '90%',
+    borderRadius: 10,
   },
 });
 

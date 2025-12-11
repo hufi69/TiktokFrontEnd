@@ -37,6 +37,7 @@ import { getAuthToken } from './src/utils/helpers/storage';
 import CreatePostScreen from './src/screens/PostScreen/CreatePostScreen';
 import CommentScreen from './src/screens/PostScreen/CommentScreen';
 import EditPostScreen from './src/screens/PostScreen/EditPostScreen';
+import socketService from './src/services/socket/socketService';
 
 function AppContent() {
   const dispatch = useAppDispatch();
@@ -71,6 +72,11 @@ function AppContent() {
         // Navigate to home immediately - backend verification can happen in background
         console.log('✅ Valid token and user found, navigating to home');
         dispatch(setCurrentScreen('home'));
+        
+        // Connect socket for real-time messaging
+        socketService.connect().catch((error) => {
+          console.log('⚠️ Socket connection failed (non-critical):', error);
+        });
         
         // Verify token with backend in background (non-blocking)
         // If verification fails, we'll handle it gracefully without redirecting
@@ -181,7 +187,11 @@ function AppContent() {
       if (loginUser.fulfilled.match(result)) {
         console.log('Login successful!');
         
-     
+        // Connect socket for real-time messaging
+        socketService.connect().catch((error) => {
+          console.log('⚠️ Socket connection failed (non-critical):', error);
+        });
+        
         if (result.payload.user && result.payload.user.isEmailVerified) {
           console.log('User is email verified, going to home');
           dispatch(setCurrentScreen('home'));
@@ -515,6 +525,8 @@ function AppContent() {
   const handleLogout = async () => {
     console.log(' Logging out user');
     try {
+      // Disconnect socket before logging out
+      socketService.disconnect();
       await dispatch(logoutUser());
       navigateToWelcomeImmediate();
     } catch (error) {
@@ -861,6 +873,7 @@ function AppContent() {
                   post={selectedPost}
                   onPostUpdated={handlePostUpdated}
                   onCommentCountUpdate={handleCommentCountUpdate}
+                  onUserProfilePress={handleUserProfilePress}
                 />
               );
               
