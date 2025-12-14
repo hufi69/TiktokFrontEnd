@@ -80,7 +80,7 @@ const CreateNewPasswordScreen = ({ onBack, onContinue, resetOTP }) => {
         >
           <View style={styles.header}>
             <BackButton onPress={onBack} />
-            <Text style={styles.title}>Create New Password</Text>
+          <Text style={styles.title}>Create New Password</Text>
           </View>
 
           {/* Illustration from assets */}

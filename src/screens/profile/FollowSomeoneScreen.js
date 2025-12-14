@@ -33,50 +33,50 @@ const getAvatarUrl = (profilePicture) => {
 
 const UserItem = ({ user, onToggleFollow, loading, onUserPress }) => {
   // Determine if this specific user is being processed
-  const isProcessing = loading && user._id;
+  const isProcessing = Boolean(loading && user._id);
   const isMutual = user.isMutual || (user.isFollowing && user.followsMe);
   
   return (
-    <View style={styles.userItem}>
-      <TouchableOpacity 
-        style={styles.userInfo} 
-        onPress={() => onUserPress(user)}
-        activeOpacity={0.7}
-      >
-        <Image 
+  <View style={styles.userItem}>
+    <TouchableOpacity 
+      style={styles.userInfo} 
+      onPress={() => onUserPress(user)}
+      activeOpacity={0.7}
+    >
+      <Image 
           source={{ uri: getAvatarUrl(user.profilePicture) }} 
-          style={styles.avatar} 
-        />
-        <View style={styles.userDetails}>
+        style={styles.avatar} 
+      />
+      <View style={styles.userDetails}>
           <View style={styles.userNameRow}>
-            <Text style={styles.userName}>{user.fullName || user.userName || 'Unknown User'}</Text>
+        <Text style={styles.userName}>{user.fullName || user.userName || 'Unknown User'}</Text>
             {isMutual && (
               <Text style={styles.mutualText}>mutual</Text>
             )}
           </View>
-          <Text style={styles.userOccupation}>{user.occupation || 'No occupation'}</Text>
-        </View>
-      </TouchableOpacity>
-      
-      <TouchableOpacity
-        style={[
-          styles.followButton,
-          user.isFollowing && styles.followingButton,
+        <Text style={styles.userOccupation}>{user.occupation || 'No occupation'}</Text>
+      </View>
+    </TouchableOpacity>
+    
+    <TouchableOpacity
+      style={[
+        styles.followButton,
+        user.isFollowing && styles.followingButton,
           isProcessing && styles.disabledButton
-        ]}
-        onPress={() => onToggleFollow(user._id)}
+      ]}
+      onPress={() => onToggleFollow(user._id)}
         disabled={isProcessing}
         activeOpacity={0.7}
-      >
-        <Text style={[
-          styles.followButtonText,
-          user.isFollowing && styles.followingButtonText
-        ]}>
+    >
+      <Text style={[
+        styles.followButtonText,
+        user.isFollowing && styles.followingButtonText
+      ]}>
           {isProcessing ? '...' : (user.isFollowing ? 'Following' : 'Follow')}
-        </Text>
-      </TouchableOpacity>
-    </View>
-  );
+      </Text>
+    </TouchableOpacity>
+  </View>
+);
 };
 
 const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {

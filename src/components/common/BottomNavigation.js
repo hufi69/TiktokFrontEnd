@@ -12,7 +12,7 @@ const TABS = [
   { id: 'profile',icon: 'user-o',        label: 'Profile' },
 ];
 
-const BottomNavigation = ({ activeTab, onTabPress }) => {
+const BottomNavigation = ({ activeTab, onTabPress, unreadCount = 0 }) => {
   const insets = useSafeAreaInsets();
 
   return (
@@ -35,11 +35,21 @@ const BottomNavigation = ({ activeTab, onTabPress }) => {
               <Icon name={tab.icon} size={20} color={colors.bg} />
             </View>
           ) : (
-            <Icon
-              name={tab.icon}
-              size={24}
-              color={activeTab === tab.id ? colors.text : colors.textLight}
-            />
+            <View style={styles.iconContainer}>
+              <Icon
+                name={tab.icon}
+                size={24}
+                color={activeTab === tab.id ? colors.text : colors.textLight}
+              />
+              {/* Unread badge for inbox */}
+              {tab.id === 'inbox' && unreadCount > 0 && (
+                <View style={styles.badge}>
+                  <Text style={styles.badgeText}>
+                    {unreadCount > 99 ? '+99' : `+${unreadCount}`}
+                  </Text>
+                </View>
+              )}
+            </View>
           )}
           <Text
             style={[
@@ -92,6 +102,28 @@ const styles = StyleSheet.create({
     fontSize: 10,
     fontWeight: '500',
     marginTop: 2,
+  },
+  iconContainer: {
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: -8,
+    right: -12,
+    backgroundColor: '#FF3040',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    paddingHorizontal: 6,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
 });
 

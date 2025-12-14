@@ -28,7 +28,7 @@ const ENVIRONMENTS = {
   LOCAL: { API_BASE_URL: pickLocalBaseUrl(), DEBUG: true },
  
   USB_DEBUG: { API_BASE_URL: ENV_API_BASE_URL || 'http://192.168.0.192:8000', DEBUG: true },
-  NGROK: { API_BASE_URL: 'https://your-ngrok-url.ngrok-free.app', DEBUG: true },
+  NGROK: { API_BASE_URL: 'https://toshiko-cogent-adell.ngrok-free.dev', DEBUG: true },
   PRODUCTION: { API_BASE_URL: 'http://51.20.81.225', DEBUG: true },
 
 };
@@ -115,7 +115,23 @@ const API_ENDPOINTS = {
   STORY_CREATE: '/api/v1/stories',
   STORY_LIKE: '/api/v1/stories/:id/like',
   STORY_REPLY: '/api/v1/stories/:id/reply',
-  STORY_SHARE: '/api/v1/stories/:id/share'
+  STORY_SHARE: '/api/v1/stories/:id/share',
+  
+  // Chats
+  CHAT_CREATE: '/api/v1/chats/create-chat',
+  CHAT_USER_CHATS: '/api/v1/chats/user-chats',
+  CHAT_GET: '/api/v1/chats/chat/:id',
+  CHAT_DELETE: '/api/v1/chats/chat/:id',
+  
+  // Messages
+  MESSAGE_CREATE: '/api/v1/messages/new-message',
+  MESSAGE_GET_CHAT: '/api/v1/messages/:chatId',
+  MESSAGE_LAST: '/api/v1/messages/:chatId/last-message',
+  MESSAGE_DELETE: '/api/v1/messages/:messageId',
+  
+  // Notifications
+  NOTIFICATION_GET: '/api/v1/notifications/get-notifications',
+  NOTIFICATION_UPDATE: '/api/v1/notifications/update-notification/:id'
 };
 
 // Get current environment config

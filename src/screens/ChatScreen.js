@@ -10,6 +10,8 @@ import {
   KeyboardAvoidingView,
   Platform,
   Alert,
+  ActivityIndicator,
+  Modal,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -19,6 +21,8 @@ import { colors, spacing } from '../constants/theme';
 import { CONFIG } from '../config';
 import socketService from '../services/socket/socketService';
 import { useAppSelector } from '../hooks/hooks';
+import { createChat, getUserChats, getChatById } from '../services/api/chatApi';
+import { createMessage, getChatMessages, deleteMessage } from '../services/api/messageApi';
 
 const DEFAULT_AVATAR =
   'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
@@ -29,32 +33,18 @@ const getAvatarUrl = (profilePicture) => {
   return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
 };
 
-const generateMockChatMessages = (user) => {
-  if (!user) return [];
-  return [
-    {
-      id: '1',
-      type: 'received',
-      sender: user,
-      occupation: user.occupation || 'Marketing Coordinator',
-      image:
-        'https://images.unsplash.com/photo-1529626465-07711f2317e8?w=400&h=400&fit=crop',
-      text: "She is adorable! Don't you want to meet her?? 😉",
-      timestamp: '10:00',
-      date: 'Today',
-    },
-  ];
-};
-
-const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
+const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId = null }) => {
   const currentUser = useAppSelector((state) => state.auth.user);
-  const [messages, setMessages] = useState(
-    initialMessages.length > 0 ? initialMessages : generateMockChatMessages(user)
-  );
+  const [messages, setMessages] = useState(initialMessages.length > 0 ? initialMessages : []);
   const [inputText, setInputText] = useState('');
   const [selectedImage, setSelectedImage] = useState(null);
   const [isTyping, setIsTyping] = useState(false);
   const [otherUserTyping, setOtherUserTyping] = useState(false);
+  const [chatId, setChatId] = useState(initialChatId);
+  const [isLoadingChat, setIsLoadingChat] = useState(false);
+  const [isLoadingMessages, setIsLoadingMessages] = useState(false);
+  const [selectedMessage, setSelectedMessage] = useState(null);
+  const [showDeleteModal, setShowDeleteModal] = useState(false);
 
   const flatListRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -68,31 +58,216 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
 
   const roomId = getRoomId();
 
+  // Create or fetch chat when component mounts
+  useEffect(() => {
+    const initializeChat = async () => {
+      if (!currentUser?._id || !user?._id) return;
+      if (chatId) return; // Chat already exists
+
+      setIsLoadingChat(true);
+      try {
+       
+        const participants = [currentUser._id, user._id]
+          .map(String)
+          .sort();
+
+        try {
+          const chatsResponse = await getUserChats();
+          const existingChat = chatsResponse?.data?.chats?.find((chat) => {
+            if (!chat.participants || chat.participants.length !== 2) return false;
+            const chatParticipants = chat.participants
+              .map((p) => (typeof p === 'object' ? p._id : p))
+              .map(String)
+              .sort();
+            return (
+              chatParticipants.length === participants.length &&
+              chatParticipants.every((id, index) => id === participants[index])
+            );
+          });
+
+          if (existingChat) {
+            setChatId(existingChat._id);
+            setIsLoadingChat(false);
+            return;
+          }
+        } catch (error) {
+          console.warn('Error fetching user chats, will create new chat:', error);
+        }
+
+        // Create new chat if not found
+        const chatResponse = await createChat(participants);
+        // Backend returns: { success: true, chat }
+        if (chatResponse?.chat?._id) {
+          setChatId(chatResponse.chat._id);
+        } else if (chatResponse?.data?.chat?._id) {
+          setChatId(chatResponse.data.chat._id);
+        } else {
+          console.warn('Chat created but no chat ID found in response:', chatResponse);
+        }
+      } catch (error) {
+        console.error('Error initializing chat:', error);
+        Alert.alert(
+          'Error',
+          error.message || 'Failed to initialize chat. Please try again.'
+        );
+      } finally {
+        setIsLoadingChat(false);
+      }
+    };
+
+    initializeChat();
+  }, [currentUser?._id, user?._id, chatId]);
+
+  // Fetch messages when chatId is available
+  useEffect(() => {
+    const fetchMessages = async () => {
+      if (!chatId || isLoadingChat) return;
+
+      setIsLoadingMessages(true);
+      try {
+        const response = await getChatMessages(chatId);
+        const messagesData = response?.messages || response?.data?.messages || [];
+
+        // Transform API messages to UI format
+        const transformedMessages = messagesData.map((msg) => {
+          // Handle sender data (could be populated object or just ID)
+          const senderData = typeof msg.sender === 'object' && msg.sender !== null
+            ? msg.sender
+            : { _id: msg.sender };
+          
+          const isFromCurrentUser = senderData._id === currentUser?._id;
+          
+          // Get attachment image if available
+          const attachment = msg.attachments && msg.attachments.length > 0 
+            ? `${CONFIG.API_BASE_URL}/public/uploads/${msg.attachments[0].filename}`
+            : null;
+
+          const messageDate = new Date(msg.createdAt || msg.timestamp);
+          const now = new Date();
+          const diffTime = Math.abs(now - messageDate);
+          const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+          let dateLabel = 'Today';
+          if (diffDays === 2) {
+            dateLabel = 'Yesterday';
+          } else if (diffDays > 2) {
+            dateLabel = messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+          }
+
+          // Determine sender info - backend populates sender with "userName email profilePicture"
+          // So we use userName from populated data, not name or fullName
+          const sender = isFromCurrentUser 
+            ? {
+                ...currentUser,
+                userName: currentUser?.userName || currentUser?.name,
+                fullName: currentUser?.fullName || currentUser?.name || currentUser?.userName,
+                profilePicture: currentUser?.profilePicture,
+              }
+            : {
+                _id: senderData._id,
+                userName: senderData.userName || user?.userName,
+                fullName: senderData.fullName || senderData.userName || user?.fullName || user?.userName,
+                profilePicture: senderData.profilePicture || user?.profilePicture,
+                email: senderData.email,
+              };
+
+          return {
+            id: msg._id,
+            type: isFromCurrentUser ? 'sent' : 'received',
+            text: msg.text || '',
+            image: attachment,
+            sender: sender,
+            timestamp: messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            date: dateLabel,
+            isRead: msg.hasRead || false,
+          };
+        });
+
+        setMessages(transformedMessages);
+      } catch (error) {
+        console.error('Error fetching messages:', error);
+        // Don't show alert, just log error - messages will be empty
+      } finally {
+        setIsLoadingMessages(false);
+      }
+    };
+
+    fetchMessages();
+  }, [chatId, isLoadingChat, currentUser, user]);
+
   // Join room and setup socket listeners
   useEffect(() => {
     if (!roomId || !currentUser || !user) return;
+    if (isLoadingChat) return; // Wait for chat to be initialized
 
-    // Join the chat room
-    socketService.joinRoom(roomId);
+    // Join the chat room (use chatId if available, otherwise use roomId)
+    const roomToJoin = chatId || roomId;
+    socketService.joinRoom(roomToJoin);
 
-    // Listen for new messages
+    // Listen for new messages from socket (real-time updates)
     const handleNewMessage = (data) => {
-      console.log('Received message:', data);
-      const isFromCurrentUser = data.senderId === currentUser._id;
+      console.log('Received message via socket:', data);
       
-      const newMessage = {
-        id: data.id || Date.now().toString(),
-        type: isFromCurrentUser ? 'sent' : 'received',
-        text: data.message || data.text || '',
-        image: data.image || null,
-        sender: isFromCurrentUser ? currentUser : user,
-        timestamp: data.timestamp 
-          ? new Date(data.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
-          : new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        date: data.date || 'Today',
-      };
+      // Check if message already exists (to avoid duplicates from API + socket)
+      setMessages((prev) => {
+        const messageId = data._id || data.id;
+        if (prev.some(msg => msg.id === messageId)) {
+          return prev; // Message already exists
+        }
 
-      setMessages((prev) => [...prev, newMessage]);
+        const isFromCurrentUser = data.sender === currentUser._id || 
+                                   data.senderId === currentUser._id ||
+                                   (typeof data.sender === 'object' && data.sender._id === currentUser._id);
+        
+        // Get attachment image if available
+        // Backend sends attachments array with { filename, originalname, mimeType }
+        const attachment = data.attachment && data.attachment.length > 0
+          ? `${CONFIG.API_BASE_URL}/public/uploads/${data.attachment[0].filename}`
+          : (data.attachments && data.attachments.length > 0
+            ? `${CONFIG.API_BASE_URL}/public/uploads/${data.attachments[0].filename}`
+            : null);
+
+        const messageDate = data.timestamp ? new Date(data.timestamp) : new Date();
+        const now = new Date();
+        const diffTime = Math.abs(now - messageDate);
+        const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+        let dateLabel = 'Today';
+        if (diffDays === 2) {
+          dateLabel = 'Yesterday';
+        } else if (diffDays > 2) {
+          dateLabel = messageDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        }
+        
+        // Determine sender info - backend populates sender with "userName email profilePicture"
+        const sender = isFromCurrentUser 
+          ? {
+              ...currentUser,
+              userName: currentUser?.userName || currentUser?.name,
+              fullName: currentUser?.fullName || currentUser?.name || currentUser?.userName,
+              profilePicture: currentUser?.profilePicture,
+            }
+          : {
+              ...user,
+              userName: user?.userName || (typeof data.sender === 'object' ? data.sender?.userName : null),
+              fullName: user?.fullName || user?.userName || (typeof data.sender === 'object' ? data.sender?.userName : null),
+              profilePicture: user?.profilePicture || (typeof data.sender === 'object' ? data.sender?.profilePicture : null),
+              email: user?.email || (typeof data.sender === 'object' ? data.sender?.email : null),
+            };
+
+        const newMessage = {
+          id: messageId || Date.now().toString(),
+          type: isFromCurrentUser ? 'sent' : 'received',
+          text: data.text || data.message || '',
+          image: attachment,
+          sender: sender,
+          timestamp: messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+          date: dateLabel,
+          isRead: data.hasRead !== undefined ? data.hasRead : false, // Use hasRead from socket if provided
+        };
+
+        return [...prev, newMessage];
+      });
     };
 
     // Listen for typing indicators
@@ -125,11 +300,12 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
       socketService.off('new_message', handleNewMessage);
       socketService.off('typing', handleTyping);
       socketService.off('message_read', handleMessageRead);
-      if (roomId) {
-        socketService.leaveRoom(roomId);
+      const roomToLeave = chatId || roomId;
+      if (roomToLeave) {
+        socketService.leaveRoom(roomToLeave);
       }
     };
-  }, [roomId, currentUser, user]);
+  }, [roomId, chatId, currentUser, user, isLoadingChat]);
 
   useEffect(() => {
     setTimeout(() => {
@@ -163,7 +339,10 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
     
     if (!isTyping && text.trim().length > 0) {
       setIsTyping(true);
-      socketService.sendTyping(roomId, true);
+      const roomToSend = chatId || roomId;
+      if (roomToSend) {
+        socketService.sendTyping(roomToSend, true);
+      }
     }
 
     // Clear existing timeout
@@ -171,22 +350,45 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
       clearTimeout(typingTimeoutRef.current);
     }
 
-    // Set new timeout to stop typing indicator
     typingTimeoutRef.current = setTimeout(() => {
       setIsTyping(false);
-      socketService.sendTyping(roomId, false);
+      const roomToSend = chatId || roomId;
+      if (roomToSend) {
+        socketService.sendTyping(roomToSend, false);
+      }
     }, 1000);
   };
 
-  const handleSend = () => {
+  const handleDeleteMessage = async () => {
+    if (!selectedMessage) return;
+
+    try {
+      await deleteMessage(selectedMessage.id);
+      // Remove message from local state
+      setMessages((prev) => prev.filter((msg) => msg.id !== selectedMessage.id));
+      setShowDeleteModal(false);
+      setSelectedMessage(null);
+    } catch (error) {
+      console.error('Error deleting message:', error);
+      Alert.alert('Error', error.message || 'Failed to delete message. Please try again.');
+      setShowDeleteModal(false);
+      setSelectedMessage(null);
+    }
+  };
+
+  const handleSend = async () => {
     if (!inputText.trim() && !selectedImage) return;
-    if (!roomId) {
-      Alert.alert('Error', 'Unable to send message. Please try again.');
+    if (!chatId) {
+      Alert.alert('Error', 'Unable to send message. Chat not initialized.');
+      return;
+    }
+    if (isLoadingChat) {
+      Alert.alert('Please wait', 'Chat is being initialized. Please try again in a moment.');
       return;
     }
 
     const messageText = inputText.trim();
-    const messageImage = selectedImage?.uri || null;
+    const messageImage = selectedImage;
 
     // Optimistically add message to UI
     const tempId = Date.now().toString();
@@ -195,35 +397,71 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
       id: tempId,
       type: 'sent',
       text: messageText,
-      image: messageImage,
+      image: messageImage?.uri || null,
       timestamp: now.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
       date: 'Today',
       isSending: true,
     };
 
     setMessages((prev) => [...prev, optimisticMessage]);
+    const previousInputText = inputText;
+    const previousImage = selectedImage;
     setInputText('');
     setSelectedImage(null);
     setIsTyping(false);
-    socketService.sendTyping(roomId, false);
+    const roomToSend = chatId || roomId;
+    if (roomToSend) {
+      socketService.sendTyping(roomToSend, false);
+    }
 
-    // Send message via socket
-    const success = socketService.sendMessage(roomId, messageText, messageImage);
-    
-    if (!success) {
-      // If socket send failed, show error and remove optimistic message
-      Alert.alert('Error', 'Failed to send message. Please check your connection.');
+    try {
+      // Prepare attachments if image is selected
+      const attachments = messageImage ? [{
+        uri: messageImage.uri,
+        type: messageImage.type || 'image/jpeg',
+        name: messageImage.fileName || `image_${Date.now()}.jpg`,
+      }] : [];
+
+      // Send message via API
+      const response = await createMessage(chatId, messageText, attachments);
+      
+      // Remove optimistic message and add the real one from API
+      setMessages((prev) => {
+        const filtered = prev.filter((msg) => msg.id !== tempId);
+        const newMessage = response?.newMessage || response?.data?.newMessage;
+        
+        if (newMessage) {
+          const messageDate = new Date(newMessage.createdAt || new Date());
+          const attachment = newMessage.attachments && newMessage.attachments.length > 0
+            ? `${CONFIG.API_BASE_URL}/public/uploads/${newMessage.attachments[0].filename}`
+            : null;
+
+          const transformedMessage = {
+            id: newMessage._id,
+            type: 'sent',
+            text: newMessage.text || '',
+            image: attachment,
+            sender: currentUser,
+            timestamp: messageDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
+            date: 'Today',
+            isRead: newMessage.hasRead || false,
+          };
+          
+          return [...filtered, transformedMessage];
+        }
+        
+        return filtered;
+      });
+
+      // Socket will also emit the message, but we've already added it from API response
+    } catch (error) {
+      console.error('Error sending message:', error);
+      // Remove optimistic message on error
       setMessages((prev) => prev.filter((msg) => msg.id !== tempId));
-    } else {
-      // Update message to remove sending indicator when confirmed
-      // The server will send back the message with proper ID
-      setTimeout(() => {
-        setMessages((prev) =>
-          prev.map((msg) =>
-            msg.id === tempId ? { ...msg, isSending: false } : msg
-          )
-        );
-      }, 500);
+      // Restore input
+      setInputText(previousInputText);
+      setSelectedImage(previousImage);
+      Alert.alert('Error', error.message || 'Failed to send message. Please try again.');
     }
   };
 
@@ -259,12 +497,22 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
                   <Text style={styles.receivedText}>{item.text}</Text>
                 </View>
               )}
-              <Text style={styles.timestamp}>{item.timestamp}</Text>
+              <Text style={styles.receivedTimestamp}>{item.timestamp}</Text>
             </View>
           </View>
         ) : (
-          <View style={styles.sentMessageContainer}>
+          <TouchableOpacity
+            style={styles.sentMessageContainer}
+            onLongPress={() => {
+              setSelectedMessage(item);
+              setShowDeleteModal(true);
+            }}
+            activeOpacity={0.9}
+          >
             <View style={styles.sentMessageContent}>
+              <Text style={styles.sentSenderName}>
+                {item.sender?.userName || item.sender?.fullName || 'You'}
+              </Text>
               {item.image && (
                 <Image source={{ uri: item.image }} style={styles.messageImage} />
               )}
@@ -273,9 +521,18 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
                   <Text style={styles.sentText}>{item.text}</Text>
                 </View>
               )}
-              <Text style={styles.timestamp}>{item.timestamp}</Text>
+              <View style={styles.timestampContainer}>
+                <Text style={styles.sentTimestamp}>{item.timestamp}</Text>
+                {item.isRead && (
+                  <Text style={styles.readIndicator}>Read</Text>
+                )}
+              </View>
             </View>
-          </View>
+            <Image
+              source={{ uri: getAvatarUrl(item.sender?.profilePicture) }}
+              style={styles.sentAvatar}
+            />
+          </TouchableOpacity>
         )}
       </View>
     );
@@ -296,14 +553,25 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
       </View>
 
       {/* MESSAGES */}
-      <FlatList
-        ref={flatListRef}
-        data={messages}
-        renderItem={renderMessage}
-        keyExtractor={(item) => item.id}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={{ padding: spacing.m, paddingBottom: 20 }}
-      />
+      {isLoadingMessages ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.pink} />
+        </View>
+      ) : (
+        <FlatList
+          ref={flatListRef}
+          data={messages}
+          renderItem={renderMessage}
+          keyExtractor={(item) => item.id}
+          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ padding: spacing.m, paddingBottom: 20 }}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No messages yet</Text>
+            </View>
+          )}
+        />
+      )}
 
       {/* SELECTED IMAGE PREVIEW */}
       {selectedImage && (
@@ -325,6 +593,50 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
         </View>
       )}
 
+      {/* DELETE MESSAGE MODAL */}
+      <Modal
+        visible={showDeleteModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => {
+          setShowDeleteModal(false);
+          setSelectedMessage(null);
+        }}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => {
+            setShowDeleteModal(false);
+            setSelectedMessage(null);
+          }}
+        >
+          <View style={styles.deleteModalContent}>
+            <Text style={styles.deleteModalTitle}>Delete Message</Text>
+            <Text style={styles.deleteModalText}>
+              Unsend this message?
+            </Text>
+            <View style={styles.deleteModalButtons}>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.cancelButton]}
+                onPress={() => {
+                  setShowDeleteModal(false);
+                  setSelectedMessage(null);
+                }}
+              >
+                <Text style={styles.cancelButtonText}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.deleteModalButton, styles.deleteButton]}
+                onPress={handleDeleteMessage}
+              >
+                <Text style={styles.deleteButtonText}>Delete</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+
       {/* INPUT BAR */}
       <View style={styles.inputContainer}>
         <TextInput
@@ -336,7 +648,10 @@ const ChatScreen = ({ onBack, user, initialMessages = [] }) => {
           multiline
         />
 
-        <TouchableOpacity onPress={handleImagePicker}>
+        <TouchableOpacity 
+          style={styles.cameraButton}
+          onPress={handleImagePicker}
+        >
           <Icon name="camera" size={24} color={colors.text} />
         </TouchableOpacity>
 
@@ -400,37 +715,98 @@ const styles = StyleSheet.create({
   },
   dateText: { fontSize: 12, color: colors.muted },
 
-  receivedMessageContainer: { flexDirection: 'row', marginBottom: 15 },
-  avatar: { width: 40, height: 40, borderRadius: 20, marginRight: 10 },
+  receivedMessageContainer: { 
+    flexDirection: 'row', 
+    marginBottom: 15,
+    alignItems: 'flex-start',
+  },
+  avatar: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    marginRight: 10,
+  },
+  sentAvatar: { 
+    width: 40, 
+    height: 40, 
+    borderRadius: 20, 
+    marginLeft: 10,
+  },
 
-  receivedMessageContent: { flex: 1 },
-  senderName: { fontWeight: '600', marginBottom: 4 },
+  receivedMessageContent: { 
+    maxWidth: '75%',
+    flexShrink: 1,
+  },
+  senderName: { 
+    fontWeight: '600', 
+    fontSize: 13,
+    marginBottom: 4,
+    color: colors.text,
+  },
+  sentSenderName: {
+    fontWeight: '600',
+    fontSize: 13,
+    marginBottom: 4,
+    color: colors.text,
+    textAlign: 'right',
+  },
 
   receivedBubble: {
     backgroundColor: '#F0F0F0',
     padding: 10,
     borderRadius: 14,
-    marginTop: 4,
+    marginTop: 2,
+    alignSelf: 'flex-start',
+    maxWidth: '100%',
   },
-  receivedText: { fontSize: 14 },
+  receivedText: { 
+    fontSize: 14,
+    color: colors.text,
+  },
 
   sentMessageContainer: {
     flexDirection: 'row',
     justifyContent: 'flex-end',
     marginBottom: 15,
+    alignItems: 'flex-start',
   },
   sentMessageContent: {
-    maxWidth: '80%',
+    maxWidth: '75%',
     alignItems: 'flex-end',
+    marginRight: 10,
   },
   sentBubble: {
     backgroundColor: colors.pink,
     padding: 10,
     borderRadius: 14,
+    marginTop: 2,
   },
-  sentText: { color: '#fff', fontSize: 14 },
+  sentText: { 
+    color: '#fff', 
+    fontSize: 14,
+  },
 
-  timestamp: { marginTop: 4, fontSize: 11, color: colors.muted },
+  timestampContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+    gap: 6,
+    justifyContent: 'flex-end',
+  },
+  receivedTimestamp: {
+    fontSize: 11,
+    color: colors.muted,
+    marginTop: 4,
+  },
+  sentTimestamp: {
+    fontSize: 11,
+    color: colors.muted,
+  },
+  readIndicator: {
+    fontSize: 11,
+    color: colors.pink,
+    fontWeight: '600',
+  },
 
   messageImage: {
     width: 220,
@@ -465,6 +841,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#fff',
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    gap: 10,
   },
 
   input: {
@@ -475,7 +852,11 @@ const styles = StyleSheet.create({
     paddingVertical: 10,
     fontSize: 14,
     maxHeight: 100,
-    marginRight: 10,
+  },
+
+  cameraButton: {
+    padding: 8,
+    marginLeft: 5,
   },
 
   sendButton: {
@@ -485,6 +866,7 @@ const styles = StyleSheet.create({
     backgroundColor: colors.pink,
     justifyContent: 'center',
     alignItems: 'center',
+    marginLeft: 5,
   },
   sendButtonDisabled: {
     backgroundColor: colors.muted,
@@ -499,5 +881,73 @@ const styles = StyleSheet.create({
     fontSize: 12,
     color: colors.muted,
     fontStyle: 'italic',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
+  },
+  emptyText: {
+    fontSize: 16,
+    color: colors.muted,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  deleteModalContent: {
+    backgroundColor: '#fff',
+    borderRadius: 12,
+    padding: spacing.l,
+    width: '80%',
+    maxWidth: 400,
+  },
+  deleteModalTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: colors.text,
+    marginBottom: spacing.s,
+  },
+  deleteModalText: {
+    fontSize: 14,
+    color: colors.muted,
+    marginBottom: spacing.l,
+    lineHeight: 20,
+  },
+  deleteModalButtons: {
+    flexDirection: 'row',
+    justifyContent: 'flex-end',
+    gap: spacing.m,
+  },
+  deleteModalButton: {
+    paddingHorizontal: spacing.l,
+    paddingVertical: spacing.s,
+    borderRadius: 8,
+    minWidth: 80,
+    alignItems: 'center',
+  },
+  cancelButton: {
+    backgroundColor: '#f0f0f0',
+  },
+  cancelButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  deleteButton: {
+    backgroundColor: '#FF3040',
+  },
+  deleteButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: '#fff',
   },
 });

@@ -16,6 +16,7 @@ import {
   unfollowUser,
   checkIsFollowing
 } from '../../store/slices/userSlice';
+import { setSelectedChatUser, setCurrentScreen } from '../../store/slices/uiSlice';
 import BackButton from '../../components/common/BackButton';
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
@@ -28,7 +29,7 @@ const getAvatarUrl = (profilePicture) => {
     : `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}`;
 };
 
-const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone, isFollowing, isLoading, onProfilePicturePress }) => {
+const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone, isFollowing, isLoading, onProfilePicturePress, onMessagePress }) => {
   const dispatch = useAppDispatch();
   const { postsCount, userPosts } = useAppSelector(state => state.user);
 
@@ -85,23 +86,33 @@ const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollow
             </TouchableOpacity>
           </>
         ) : (
-          <TouchableOpacity 
-            style={[
-              styles.followButton,
-              isFollowing && styles.followingButton,
-              isLoading && styles.disabledButton
-            ]}
-            onPress={onFollowToggle}
-            disabled={isLoading}
-            activeOpacity={0.7}
-          >
-            <Text style={[
-              styles.followButtonText,
-              isFollowing && styles.followingButtonText
-            ]}>
-              {isLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
-            </Text>
-          </TouchableOpacity>
+          <>
+            <TouchableOpacity 
+              style={[
+                styles.followButton,
+                isFollowing && styles.followingButton,
+                isLoading && styles.disabledButton
+              ]}
+              onPress={onFollowToggle}
+              disabled={isLoading}
+              activeOpacity={0.7}
+            >
+              <Text style={[
+                styles.followButtonText,
+                isFollowing && styles.followingButtonText
+              ]}>
+                {isLoading ? '...' : (isFollowing ? 'Following' : 'Follow')}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity 
+              style={styles.messageButton}
+              onPress={onMessagePress}
+              activeOpacity={0.7}
+            >
+              <Icon name="comment" size={16} color={colors.pink} />
+              <Text style={styles.messageButtonText}>Message</Text>
+            </TouchableOpacity>
+          </>
         )}
       </View>
 
@@ -252,7 +263,7 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
   );
 };
 
-const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, onFollowSomeone, onCreatePost, refreshTrigger, onUserProfilePress }) => {
+const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, onFollowSomeone, onCreatePost, refreshTrigger, onUserProfilePress, onMessagePress }) => {
   const dispatch = useAppDispatch();
   const { user: currentUser } = useAppSelector(state => state.auth);
   const { 
@@ -515,6 +526,17 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     }
   };
 
+  const handleMessage = () => {
+    console.log('Message pressed for user:', userId);
+    if (onMessagePress && viewedUser) {
+      onMessagePress(viewedUser);
+    } else if (viewedUser) {
+      // Navigate to chat screen using Redux
+      dispatch(setSelectedChatUser(viewedUser));
+      dispatch(setCurrentScreen('chat'));
+    }
+  };
+
   const renderContent = () => {
     switch (activeTab) {
       case 'posts':
@@ -624,6 +646,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
         isFollowing={isFollowingUser}
         isLoading={isFollowLoading}
         onProfilePicturePress={() => setShowImagePreview(true)}
+        onMessagePress={handleMessage}
       />
 
       <View style={styles.tabContainer}>
@@ -862,17 +885,18 @@ const styles = StyleSheet.create({
     color: colors.muted,
   },
   followButton: {
+    flex: 1,
     paddingHorizontal: 20,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 30,
     backgroundColor: colors.pink,
-    minWidth: 80,
     alignItems: 'center',
   },
   followingButton: {
     backgroundColor: 'transparent',
     borderWidth: 1,
     borderColor: colors.pink,
+    borderRadius: 25,
   },
   followButtonText: {
     fontSize: 14,
@@ -880,6 +904,24 @@ const styles = StyleSheet.create({
     color: '#fff',
   },
   followingButtonText: {
+    color: colors.pink,
+  },
+  messageButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    borderRadius: 25,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: colors.pink,
+    gap: 6,
+  },
+  messageButtonText: {
+    fontSize: 14,
+    fontWeight: '600',
     color: colors.pink,
   },
   disabledButton: {

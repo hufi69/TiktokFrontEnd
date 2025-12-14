@@ -44,10 +44,14 @@ export async function createPost(postData) {
     if (Array.isArray(postData.images)) {
       postData.images.forEach((image, idx) => {
         if (image?.uri) {
+          const type = image.type || 'image/jpeg';
+          const isVideo = typeof type === 'string' && type.startsWith('video/');
+          const fallbackName = isVideo ? `video_${idx}.mp4` : `image_${idx}.jpg`;
+
           formData.append('images', {
             uri: image.uri,
-            type: image.type || 'image/jpeg',
-            name: image.fileName || `image_${idx}.jpg`,
+            type,
+            name: image.fileName || image.name || image.filename || fallbackName,
           });
         }
       });

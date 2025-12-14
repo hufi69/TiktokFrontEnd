@@ -9,6 +9,9 @@ export * as postsApi from './postsApi';
 export * as followApi from './followApi';
 export * as commentsApi from './commentsApi';
 export * as likesApi from './likesApi';
+export * as chatApi from './chatApi';
+export * as messageApi from './messageApi';
+export * as notificationApi from './notificationApi';
 
 
 export {
@@ -69,3 +72,22 @@ export {
   likeComment as likeCommentAction,
   unlikeComment as unlikeCommentAction
 } from './likesApi';
+
+export {
+  createChat,
+  getUserChats,
+  getChatById,
+  deleteChat
+} from './chatApi';
+
+export {
+  createMessage,
+  getChatMessages,
+  getLastMessage,
+  deleteMessage
+} from './messageApi';
+
+export {
+  getNotifications,
+  updateNotification
+} from './notificationApi';

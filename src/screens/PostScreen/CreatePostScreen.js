@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import {
   View, Text, StyleSheet, TextInput, TouchableOpacity, 
-  Image, Alert, ScrollView, KeyboardAvoidingView, Platform
+  Image, Alert, ScrollView, KeyboardAvoidingView, Platform,
+  PermissionsAndroid
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -16,7 +17,61 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
   const [media, setMedia] = useState([]);
   const [isLoading, setIsLoading] = useState(false);
 
-  const handleMediaPicker = async (type) => {
+  const isVideoAsset = (asset) => {
+    if (!asset) return false;
+    if (asset.type?.startsWith('video/')) return true;
+    const uri = asset.uri || '';
+    return uri.includes('.mp4') || uri.includes('.mov') || uri.includes('.m4v') || uri.includes('.webm');
+  };
+
+  const normalizeAsset = (asset) => {
+    const isVideo = isVideoAsset(asset);
+    const type =
+      asset.type ||
+      (isVideo ? 'video/mp4' : 'image/jpeg');
+
+    const fileName =
+      asset.fileName ||
+      (isVideo ? `video_${Date.now()}.mp4` : `image_${Date.now()}.jpg`);
+
+    return {
+      uri: asset.uri,
+      type,
+      // Keep both keys: some parts of the app use fileName, others use name
+      fileName,
+      name: fileName,
+      isVideo,
+    };
+  };
+
+  const addPickedAssets = (assets) => {
+    if (!Array.isArray(assets) || assets.length === 0) return;
+    setMedia(prev => {
+      const remainingSlots = 5 - prev.length;
+      if (remainingSlots <= 0) {
+        // Defer alert to avoid calling it inside state update
+        setTimeout(() => {
+          Alert.alert('Limit Reached', 'You can only add up to 5 photos and videos per post.');
+        }, 0);
+        return prev;
+      }
+
+      const mediaToAdd = assets
+        .slice(0, remainingSlots)
+        .map(normalizeAsset)
+        .filter(item => item?.uri);
+
+      if (assets.length > remainingSlots) {
+        setTimeout(() => {
+          Alert.alert('Limit Reached', `Only ${remainingSlots} item(s) added. Maximum 5 photos and videos per post.`);
+        }, 0);
+      }
+
+      return [...prev, ...mediaToAdd];
+    });
+  };
+
+  const pickFromGallery = async () => {
     try {
       const remainingSlots = 5 - media.length;
       if (remainingSlots <= 0) {
@@ -25,36 +80,110 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
       }
 
       const options = {
-        mediaType: 'mixed', 
+        mediaType: 'mixed',
         quality: 0.8,
         maxWidth: 1024,
         maxHeight: 1024,
         videoQuality: 'high',
-        multiple: type === 'gallery',
-        selectionLimit: type === 'gallery' ? remainingSlots : 1,
+        selectionLimit: remainingSlots,
         saveToPhotos: false,
       };
 
-      const result = type === 'camera' 
-        ? await launchCamera(options)
-        : await launchImageLibrary(options);
-
-      if (result.assets && result.assets.length > 0) {
-        const mediaToAdd = result.assets.slice(0, remainingSlots);
-        const newMedia = mediaToAdd.map(asset => ({
-          uri: asset.uri,
-          type: asset.type || (asset.uri?.includes('.mp4') || asset.uri?.includes('.mov') ? 'video/mp4' : 'image/jpeg'),
-          name: asset.fileName || (asset.type?.startsWith('video/') ? `video_${Date.now()}.mp4` : `image_${Date.now()}.jpg`),
-          isVideo: asset.type?.startsWith('video/') || asset.uri?.includes('.mp4') || asset.uri?.includes('.mov'),
-        }));
-        setMedia([...media, ...newMedia]);
-        if (result.assets.length > remainingSlots) {
-          Alert.alert('Limit Reached', `Only ${remainingSlots} item(s) added. Maximum 5 photos and videos per post.`);
-        }
+      const result = await launchImageLibrary(options);
+      if (result?.didCancel) return;
+      if (result?.errorCode) {
+        Alert.alert('Error', result.errorMessage || 'Failed to pick media');
+        return;
       }
-    } catch (error) {
+
+      addPickedAssets(result.assets);
+    } catch (_error) {
       Alert.alert('Error', 'Failed to pick media');
     }
+  };
+
+  const requestCameraPermission = async () => {
+    if (Platform.OS === 'android') {
+      try {
+        const granted = await PermissionsAndroid.request(
+          PermissionsAndroid.PERMISSIONS.CAMERA,
+          {
+            title: 'Camera Permission',
+            message: 'This app needs access to your camera to take photos and videos.',
+            buttonNeutral: 'Ask Me Later',
+            buttonNegative: 'Cancel',
+            buttonPositive: 'OK',
+          },
+        );
+        return granted === PermissionsAndroid.RESULTS.GRANTED;
+      } catch (err) {
+        console.warn(err);
+        return false;
+      }
+    }
+    return true;
+  };
+
+  const captureFromCamera = async (captureType) => {
+    try {
+      const remainingSlots = 5 - media.length;
+      if (remainingSlots <= 0) {
+        Alert.alert('Limit Reached', 'You can only add up to 5 photos and videos per post.');
+        return;
+      }
+
+      // Request camera permission before launching camera
+      const hasPermission = await requestCameraPermission();
+      if (!hasPermission) {
+        Alert.alert('Permission Denied', 'Camera permission is required to take photos and videos.');
+        return;
+      }
+
+      const baseOptions = {
+        saveToPhotos: false,
+      };
+
+      const options =
+        captureType === 'video'
+          ? {
+              ...baseOptions,
+              mediaType: 'video',
+              videoQuality: 'high',
+              durationLimit: 60,
+            }
+          : {
+              ...baseOptions,
+              mediaType: 'photo',
+              quality: 0.8,
+              maxWidth: 1024,
+              maxHeight: 1024,
+            };
+
+      const result = await launchCamera(options);
+      if (result?.didCancel) return;
+      if (result?.errorCode) {
+        Alert.alert('Error', result.errorMessage || 'Failed to open camera');
+        return;
+      }
+
+      addPickedAssets(result.assets);
+    } catch (_error) {
+      Alert.alert('Error', 'Failed to open camera');
+    }
+  };
+
+  const handleCameraPress = () => {
+    const remainingSlots = 5 - media.length;
+    if (remainingSlots <= 0) {
+      Alert.alert('Limit Reached', 'You can only add up to 5 photos and videos per post.');
+      return;
+    }
+
+    Alert.alert('Camera', 'Choose what to capture', [
+      { text: 'Take Photo', onPress: () => captureFromCamera('photo') },
+      { text: 'Record Video', onPress: () => captureFromCamera('video') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const removeMedia = (index) => {
@@ -155,7 +284,7 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => handleMediaPicker('gallery')}
+              onPress={pickFromGallery}
             >
               <Icon name="image" size={20} color={colors.primary} />
               <Text style={styles.actionButtonText}>Photos & Videos</Text>
@@ -163,7 +292,7 @@ const CreatePostScreen = ({ onBack, onPostCreated }) => {
 
             <TouchableOpacity 
               style={styles.actionButton}
-              onPress={() => handleMediaPicker('camera')}
+              onPress={handleCameraPress}
             >
               <Icon name="camera" size={20} color={colors.primary} />
               <Text style={styles.actionButtonText}>Camera</Text>

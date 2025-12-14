@@ -50,7 +50,6 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   const [repliesCursorById, setRepliesCursorById] = useState({});
   const [repliesLoadingMore, setRepliesLoadingMore] = useState({});
   const loadingMoreRef = useRef(false);
-  const [keyboardHeight, setKeyboardHeight] = useState(0);
 
   // State for Edit Comment Modal
   const [isEditModalVisible, setEditModalVisible] = useState(false);
@@ -226,27 +225,6 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   const onRefresh = useCallback(async () => { setRefreshing(true); try { await loadInitial(); } finally { setRefreshing(false); } }, [loadInitial]);
 
   useEffect(() => { if (postId) { loadInitial(); } }, [postId, loadInitial]);
-
-  // Handle keyboard show/hide
-  useEffect(() => {
-    const keyboardWillShow = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillShow' : 'keyboardDidShow',
-      (e) => {
-        setKeyboardHeight(e.endCoordinates.height);
-      }
-    );
-    const keyboardWillHide = Keyboard.addListener(
-      Platform.OS === 'ios' ? 'keyboardWillHide' : 'keyboardDidHide',
-      () => {
-        setKeyboardHeight(0);
-      }
-    );
-
-    return () => {
-      keyboardWillShow.remove();
-      keyboardWillHide.remove();
-    };
-  }, []);
 
 
   // handleSend function
@@ -664,25 +642,21 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   );
 
   return (
-    <SafeAreaView style={styles.container}>
-      <KeyboardAvoidingView 
-        style={{ flex: 1 }} 
-        behavior={Platform.OS === 'ios' ? 'padding' : 'height'} 
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
-      >
-        <View style={styles.topBar}>
-          <TouchableOpacity onPress={onBack} hitSlop={8}>
-            <Icon name="chevron-left" size={22} color={colors.text} />
-          </TouchableOpacity>
-          <Text style={styles.title}>Comments</Text>
-          <View style={{ width: 22 }} />
-        </View>
+    <SafeAreaView style={styles.container} edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['top']}>
+      <View style={styles.topBar}>
+        <TouchableOpacity onPress={onBack} hitSlop={8}>
+          <Icon name="chevron-left" size={22} color={colors.text} />
+        </TouchableOpacity>
+        <Text style={styles.title}>Comments</Text>
+        <View style={{ width: 22 }} />
+      </View>
 
+      <View style={{ flex: 1 }}>
         <FlashList
           data={comments}
           keyExtractor={(item, index) => getId(item) || String(index)}
           renderItem={renderItem}
-          contentContainerStyle={{ paddingBottom: keyboardHeight > 0 ? keyboardHeight + 100 : 100 }}
+          contentContainerStyle={styles.listContent}
           ListFooterComponent={cursor ? <Text style={styles.footerLoading}>Loading…</Text> : null}
           refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
           onEndReachedThreshold={0.3}
@@ -720,41 +694,55 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
             </View>
           </View>
         </Modal>
+      </View>
+      
+      {(() => {
+        const composerContent = (
+          <View style={[
+            styles.composer, 
+            replyTo && styles.composerReply
+          ]}>
+            {replyTo ? (
+              <View style={styles.replyPill}>
+                <Text numberOfLines={1} style={styles.replyPillText}>Replying to {replyTo.user?.fullName || replyTo.user?.userName}</Text>
+                <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
+                  <Icon name="times" size={16} color={colors.textLight} />
+                </TouchableOpacity>
+              </View>
+            ) : null}
 
-        <View style={[
-          styles.composer, 
-          replyTo && styles.composerReply,
-          { bottom: keyboardHeight > 0 ? keyboardHeight : 0 }
-        ]}>
-          {replyTo ? (
-            <View style={styles.replyPill}>
-              <Text numberOfLines={1} style={styles.replyPillText}>Replying to {replyTo.user?.fullName || replyTo.user?.userName}</Text>
-              <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
-                <Icon name="times" size={16} color={colors.textLight} />
+            <View style={[styles.inputRow, replyTo && styles.inputRowReply]}>
+              <TextInput
+                ref={inputRef}
+                value={input}
+                onChangeText={setInput}
+                placeholder={replyTo ? 'Write a reply…' : 'Your comment…'}
+                placeholderTextColor={colors.textLight}
+                style={styles.input}
+                multiline
+                maxLength={1000}
+                returnKeyType={'send'}
+                onSubmitEditing={handleSend}
+                blurOnSubmit={false}
+              />
+              <TouchableOpacity onPress={handleSend} disabled={!input.trim()} style={[styles.postBtn, !input.trim() && { opacity: 0.5 }]}>
+                <Text style={styles.postBtnTxt}>Post</Text>
               </TouchableOpacity>
             </View>
-          ) : null}
-
-          <View style={[styles.inputRow, replyTo && styles.inputRowReply]}>
-            <TextInput
-              ref={inputRef}
-              value={input}
-              onChangeText={setInput}
-              placeholder={replyTo ? 'Write a reply…' : 'Your comment…'}
-              placeholderTextColor={colors.textLight}
-              style={styles.input}
-              multiline
-              maxLength={1000}
-              returnKeyType={'send'}
-              onSubmitEditing={handleSend}
-              blurOnSubmit={false}
-            />
-            <TouchableOpacity onPress={handleSend} disabled={!input.trim()} style={[styles.postBtn, !input.trim() && { opacity: 0.5 }]}>
-              <Text style={styles.postBtnTxt}>Post</Text>
-            </TouchableOpacity>
           </View>
-        </View>
-      </KeyboardAvoidingView>
+        );
+
+        return Platform.OS === 'ios' ? (
+          <KeyboardAvoidingView 
+            behavior="padding"
+            keyboardVerticalOffset={0}
+          >
+            {composerContent}
+          </KeyboardAvoidingView>
+        ) : (
+          composerContent
+        );
+      })()}
     </SafeAreaView>
   );
 };
@@ -763,6 +751,7 @@ const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: colors.bg },
   topBar: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: spacing.m, paddingVertical: spacing.s, borderBottomWidth: 0.5, borderBottomColor: colors.border, backgroundColor: colors.bg },
   title: { flex: 1, textAlign: 'center', fontSize: 18, fontWeight: '700', color: colors.text },
+  listContent: { paddingBottom: 20 },
 
   commentRow: { flexDirection: 'row', paddingHorizontal: spacing.m, paddingVertical: spacing.m, borderBottomWidth: 0.5, borderBottomColor: colors.bgAlt },
   avatarSm: { width: 36, height: 36, borderRadius: 18, marginRight: spacing.s },
@@ -789,7 +778,7 @@ const styles = StyleSheet.create({
 
   footerLoading: { textAlign: 'center', color: colors.muted, padding: 12 },
 
-  composer: { position: 'absolute', left: 0, right: 0, bottom: 0, backgroundColor: colors.bg, borderTopWidth: 0.5, borderTopColor: colors.border, padding: spacing.s },
+  composer: { backgroundColor: colors.bg, borderTopWidth: 0.5, borderTopColor: colors.border, padding: spacing.s },
   composerReply: { paddingBottom: spacing.m },
   replyPill: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', paddingHorizontal: spacing.s, paddingVertical: spacing.s, marginBottom: spacing.s, borderRadius: radius.l, backgroundColor: colors.bgAlt },
   replyPillText: { color: colors.text, fontSize: 12, flex: 1, marginRight: spacing.s },

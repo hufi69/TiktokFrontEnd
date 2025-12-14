@@ -38,8 +38,8 @@ const SplashScreen = ({ onFinish, shouldAutoNavigate = true }) => {
     // This prevents navigation when app initialization has already handled navigation
     if (shouldAutoNavigate) {
       const timer = setTimeout(() => {
-        onFinish();
-      }, 3000);
+      onFinish();
+    }, 3000);
       
       return () => clearTimeout(timer);
     }

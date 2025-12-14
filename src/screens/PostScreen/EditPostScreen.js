@@ -94,9 +94,9 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
                 // post.images is an array of URL strings
                 if (!imageUri || typeof imageUri !== 'string') return null;
                 return (
-                  <View key={index} style={styles.imagePreviewItem}>
+                <View key={index} style={styles.imagePreviewItem}>
                     <Image source={{ uri: imageUri }} style={styles.imagePreviewImage} />
-                  </View>
+                </View>
                 );
               })}
             </ScrollView>

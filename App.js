@@ -940,6 +940,10 @@ function AppContent() {
             onCreatePost={handleCreatePost}
             onFollowSomeone={handleProfileFollowSomeone}
             onUserProfilePress={handleUserProfilePress}
+            onMessagePress={(user) => {
+              dispatch(setSelectedChatUser(user));
+              dispatch(setCurrentScreen('chat'));
+            }}
             route={{ params: { userId: selectedUserId } }}
             refreshTrigger={profileRefreshTrigger}
           />
@@ -975,7 +979,7 @@ function AppContent() {
             onBack={() => dispatch(setCurrentScreen('home'))}
             onUserPress={handleUserProfilePress}
             onMessagePress={(message) => {
-              dispatch(setSelectedChatUser(message.user));
+              dispatch(setSelectedChatUser({ ...message.user, chatId: message.chatId }));
               dispatch(setCurrentScreen('chat'));
             }}
             onCreateMessage={() => {
@@ -992,6 +996,7 @@ function AppContent() {
               dispatch(setCurrentScreen('inbox'));
             }}
             user={selectedChatUser}
+            chatId={selectedChatUser?.chatId || null}
           />
         );
       default:

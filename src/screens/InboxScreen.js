@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -7,12 +7,15 @@ import {
   TouchableOpacity,
   Image,
   TextInput,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import BackButton from '../components/common/BackButton';
 import { colors, spacing } from '../constants/theme';
 import { CONFIG } from '../config';
+import { getUserChats } from '../services/api/chatApi';
+import { useAppSelector } from '../hooks/hooks';
 
 // Default avatar
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
@@ -26,95 +29,106 @@ const getAvatarUrl = (profilePicture) => {
   return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
 };
 
-// Mock messages data
-const generateMockMessages = () => {
-  return [
-    {
-      id: '1',
-      user: {
-        _id: 'user1',
-        userName: 'annetteblack',
-        fullName: 'Annette Black',
-        profilePicture: 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face',
-      },
-      lastMessage: 'Message',
-      timestamp: '20.00',
-      unreadCount: 3,
-      isRead: false,
-    },
-    {
-      id: '2',
-      user: {
-        _id: 'user2',
-        userName: 'wadewarren',
-        fullName: 'Wade Warren',
-        profilePicture: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=150&h=150&fit=crop&crop=face',
-      },
-      lastMessage: 'perfect!',
-      timestamp: '16.20',
-      unreadCount: 3,
-      isRead: false,
-    },
-    {
-      id: '3',
-      user: {
-        _id: 'user3',
-        userName: 'jennywilson',
-        fullName: 'Jenny Wilson',
-        profilePicture: 'https://images.unsplash.com/photo-1438761681033-6461ffad8d80?w=150&h=150&fit=crop&crop=face',
-      },
-      lastMessage: 'How are you?',
-      timestamp: 'Yesterday',
-      unreadCount: 0,
-      isRead: true,
-    },
-    {
-      id: '4',
-      user: {
-        _id: 'user4',
-        userName: 'theresawebb',
-        fullName: 'Theresa Webb',
-        profilePicture: 'https://images.unsplash.com/photo-1544005313-94ddf0286df2?w=150&h=150&fit=crop&crop=face',
-      },
-      lastMessage: 'Haha that\'s terrifying 😂',
-      timestamp: 'Yesterday',
-      unreadCount: 0,
-      isRead: true,
-    },
-    {
-      id: '5',
-      user: {
-        _id: 'user5',
-        userName: 'brooklynsimmons',
-        fullName: 'Brooklyn Simmons',
-        profilePicture: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=150&h=150&fit=crop&crop=face',
-      },
-      lastMessage: 'I\'ll be there in 2 mins',
-      timestamp: 'Yesterday',
-      unreadCount: 0,
-      isRead: true,
-    },
-    {
-      id: '6',
-      user: {
-        _id: 'user6',
-        userName: 'robertfox',
-        fullName: 'Robert Fox',
-        profilePicture: 'https://images.unsplash.com/photo-1534528741775-53994a69daeb?w=150&h=150&fit=crop&crop=face',
-      },
-      lastMessage: 'aww',
-      timestamp: 'Dec 22, 24',
-      unreadCount: 0,
-      isRead: true,
-    },
-  ];
+// Helper function to format timestamp
+const formatTimestamp = (dateString) => {
+  if (!dateString) return '';
+  
+  try {
+    const date = new Date(dateString);
+    if (isNaN(date.getTime())) return '';
+    
+    const now = new Date();
+    const diffTime = Math.abs(now - date);
+    const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+
+    // Same day - show time
+    if (diffDays === 1) {
+      return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: false });
+    } 
+    // Yesterday
+    else if (diffDays === 2) {
+      return 'Yesterday';
+    } 
+    // Within a week
+    else if (diffDays <= 7) {
+      return `${diffDays - 1} days ago`;
+    } 
+    // Older
+    else {
+      return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: '2-digit' });
+    }
+  } catch (error) {
+    console.error('Error formatting timestamp:', error);
+    return '';
+  }
 };
 
 const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) => {
-  const [messages] = useState(generateMockMessages());
+  const currentUser = useAppSelector((state) => state.auth.user);
+  const [chats, setChats] = useState([]);
+  const [isLoading, setIsLoading] = useState(true);
   const [searchQuery, setSearchQuery] = useState('');
 
-  const filteredMessages = messages.filter(message => {
+  // Fetch user chats
+  useEffect(() => {
+    const fetchChats = async () => {
+      try {
+        setIsLoading(true);
+        const response = await getUserChats();
+        const chatsData = response?.data?.chats || [];
+        
+      
+        const transformedChats = chatsData.map((chat) => {
+         
+          const otherParticipant = chat.participants?.find(
+            (p) => (typeof p === 'object' ? p._id : p) !== currentUser?._id
+          ) || chat.participants?.[0];
+
+          
+          const participantData = typeof otherParticipant === 'object' 
+            ? otherParticipant 
+            : { _id: otherParticipant };
+
+    
+          const displayName =participantData.userName || participantData.fullName;
+
+      
+          const lastMessageText = chat.lastMessage?.text || '';
+          const lastMessageTime = chat.lastMessage?.sentAt || chat.updatedAt || chat.createdAt;
+
+          return {
+            id: chat._id,
+            chatId: chat._id,
+            user: {
+              _id: participantData._id,
+              userName: displayName,
+              fullName: displayName,
+              name: participantData.name,
+              email: participantData.email,
+              profilePicture: participantData.profilePicture || null,
+            },
+            lastMessage: lastMessageText || 'No messages yet',
+            timestamp: formatTimestamp(lastMessageTime),
+            unreadCount: 0, // TODO: Implement unread count from backend
+            isRead: true, // TODO: Implement read status from backend
+          };
+        });
+
+        setChats(transformedChats);
+      } catch (error) {
+        console.error('Error fetching chats:', error);
+        setChats([]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+
+    if (currentUser?._id) {
+      fetchChats();
+    }
+  }, [currentUser?._id]);
+
+  const filteredMessages = chats.filter(message => {
     if (!searchQuery) return true;
     const query = searchQuery.toLowerCase();
     return (
@@ -194,19 +208,25 @@ const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) =
       </View>
 
       {/* Messages List */}
-      <FlatList
-        data={filteredMessages}
-        keyExtractor={(item) => item.id}
-        renderItem={renderMessageItem}
-        contentContainerStyle={styles.listContent}
-        showsVerticalScrollIndicator={false}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={() => (
-          <View style={styles.emptyContainer}>
-            <Text style={styles.emptyText}>No messages found</Text>
-          </View>
-        )}
-      />
+      {isLoading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color={colors.pink} />
+        </View>
+      ) : (
+        <FlatList
+          data={filteredMessages}
+          keyExtractor={(item) => item.id || item.chatId}
+          renderItem={renderMessageItem}
+          contentContainerStyle={styles.listContent}
+          showsVerticalScrollIndicator={false}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No messages found</Text>
+            </View>
+          )}
+        />
+      )}
     </SafeAreaView>
   );
 };
@@ -357,6 +377,12 @@ const styles = StyleSheet.create({
   emptyText: {
     fontSize: 16,
     color: colors.muted,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 60,
   },
 });
 
