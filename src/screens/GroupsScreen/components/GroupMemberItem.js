@@ -17,6 +17,11 @@ const GroupMemberItem = ({ member, onPress, currentUserRole, onRoleChange }) => 
   const isAdmin = member.role === 'admin';
   const isModerator = member.role === 'moderator';
   const canManage = currentUserRole === 'admin';
+  const isCurrentUser = false; 
+  const handleMenuPress = (e) => {
+    e.stopPropagation();
+    onRoleChange?.(member);
+  };
 
   return (
     <TouchableOpacity 
@@ -48,10 +53,10 @@ const GroupMemberItem = ({ member, onPress, currentUserRole, onRoleChange }) => 
           @{member.user?.userName || 'unknown'}
         </Text>
       </View>
-      {canManage && !isAdmin && (
+      {canManage && (
         <TouchableOpacity 
           style={styles.menuButton}
-          onPress={() => onRoleChange?.(member)}
+          onPress={handleMenuPress}
         >
           <Icon name="ellipsis-v" size={18} color={colors.textLight} />
         </TouchableOpacity>
