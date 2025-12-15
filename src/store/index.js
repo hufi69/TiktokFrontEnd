@@ -6,6 +6,7 @@ import userReducer from './slices/userSlice';
 import uiReducer from './slices/uiSlice';
 import likesReducer from './slices/likesSlice';
 import commentsReducer from './slices/commentSlice';
+import groupsReducer from './slices/groupsSlice';
 
 export const store = configureStore({
   reducer: {
@@ -16,6 +17,7 @@ export const store = configureStore({
     ui: uiReducer,
     likes: likesReducer,
     comments: commentsReducer,
+    groups: groupsReducer,
   },
   middleware: (getDefaultMiddleware) =>
     getDefaultMiddleware({

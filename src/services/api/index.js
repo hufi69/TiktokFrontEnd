@@ -12,6 +12,7 @@ export * as likesApi from './likesApi';
 export * as chatApi from './chatApi';
 export * as messageApi from './messageApi';
 export * as notificationApi from './notificationApi';
+export * as groupsApi from './groupsApi';
 
 
 export {

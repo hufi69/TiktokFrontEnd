@@ -25,6 +25,17 @@ import FullHomeScreen from './src/screens/HomeScreen/FullHomeScreen';
 import ActivityScreen from './src/screens/ActivityScreen';
 import InboxScreen from './src/screens/InboxScreen';
 import ChatScreen from './src/screens/ChatScreen';
+import { 
+  GroupsScreen, 
+  GroupDetailScreen, 
+  CreateGroupScreen,
+  CreateGroupPostScreen,
+  GroupMembersScreen,
+  JoinRequestsScreen,
+  InviteLinksScreen,
+  GroupSettingsScreen,
+  GroupCommentScreen
+} from './src/screens/GroupsScreen';
 
 
 import { useAppDispatch, useCurrentScreen, useAuthLoading, useAuthError, useAppSelector } from './src/hooks/hooks';
@@ -47,75 +58,66 @@ function AppContent() {
   const authError = useAuthError();
   const user = useAppSelector((state) => state.auth.user);
   const isTokenVerified = useAppSelector((state) => state.auth.isTokenVerified);
+  const currentUserId = user?._id || user?.id;
   
-  // Track if auth initialization is complete
+ 
   const [isInitializing, setIsInitializing] = useState(true);
 
-  // Load stored authentication 
+
   useEffect(() => {
     const initializeAuth = async () => {
-      // Always start with splash screen
+   
       dispatch(setCurrentScreen('splash'));
       setIsInitializing(true);
-      
-      // Show splash screen for 3-4 seconds
       await new Promise(resolve => setTimeout(resolve, 3500));
       
-      // Load stored auth (this will check token expiration)
       const loadResult = await dispatch(loadStoredAuth());
-      
       const token = await getAuthToken();
       console.log('Token check:', { hasToken: !!token, tokenLength: token?.length });
       
       if (token && loadStoredAuth.fulfilled.match(loadResult) && loadResult.payload) {
-        // We have a valid token (not expired) and user data
-        // Navigate to home immediately - backend verification can happen in background
         console.log('✅ Valid token and user found, navigating to home');
         dispatch(setCurrentScreen('home'));
         
-        // Connect socket for real-time messaging
+
         socketService.connect().catch((error) => {
           console.log('⚠️ Socket connection failed (non-critical):', error);
         });
         
-        // Verify token with backend in background (non-blocking)
-        // If verification fails, we'll handle it gracefully without redirecting
+   
         dispatch(verifyToken()).then((result) => {
-          if (verifyToken.rejected.match(result)) {
-            console.log('⚠️ Backend token verification failed, but keeping user logged in (token not expired locally)');
-            // Don't redirect - token is still valid locally, just backend check failed
-            // This could be due to network issues or backend being down
+          if (verifyToken.rejected.match(result)) {console.log('⚠️ Backend token verification failed, but keeping user logged in (token not expired locally)');
           } else {
             console.log('✅ Backend token verification successful');
           }
         }).catch((error) => {
           console.log('⚠️ Token verification error (non-critical):', error);
-          // Don't redirect on error - token is still valid locally
+        
         });
       } else {
         console.log('❌ No valid token found, redirecting to onboarding');
         dispatch(setCurrentScreen('onboarding'));
       }
       
-      // Mark initialization as complete
+
       setIsInitializing(false);
     };
     
     initializeAuth();
   }, [dispatch]);
 
-  // Track previous screen to detect transition from onboarding
+
   const [prevScreen, setPrevScreen] = useState(null);
   
   useEffect(() => {
-    // Track screen changes for animation coordination
+   
     if (currentScreen !== 'welcome') {
-      // Reset animation when leaving welcome screen
+    
       welcomeSlideAnim.setValue(0);
     }
     setPrevScreen(currentScreen);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentScreen]); // Only depend on currentScreen to avoid infinite loops
+  
+  }, [currentScreen]); 
 
   const handleSplashFinish = () => {
     dispatch(setCurrentScreen('onboarding'));
@@ -127,14 +129,14 @@ function AppContent() {
       Animated.timing(onboardingSlideAnim, {
         toValue: 1,
         duration: 400,
-        easing: Easing.out(Easing.ease), // Smooth easing
+        easing: Easing.out(Easing.ease), 
         useNativeDriver: true,
       }).start(() => {
         setOnboardingStep(2);
         onboardingSlideAnim.setValue(0);
       });
     } else {
-      // Smooth slide animation from screen 2 to welcome
+    
       startWelcomeTransition(2, 400);
     }
   };
@@ -187,14 +189,14 @@ function AppContent() {
       if (loginUser.fulfilled.match(result)) {
         console.log('Login successful!');
         
-        // Connect socket for real-time messaging
+     
         socketService.connect().catch((error) => {
           console.log('⚠️ Socket connection failed (non-critical):', error);
         });
         
         if (result.payload.user && result.payload.user.isEmailVerified) {
           console.log('User is email verified, going to home');
-          dispatch(setCurrentScreen('home'));
+            dispatch(setCurrentScreen('home'));
         } else {
           console.log(' User not email verified, going to OTP verification');
           dispatch(setCurrentScreen('otp'));
@@ -203,7 +205,6 @@ function AppContent() {
         console.log(' Login failed:', result.payload);
         const errorMessage = typeof result.payload === 'string' ? result.payload : 'Login failed. Please try again.';
         
-        // Use setTimeout to ensure Alert is shown after current execution completes
         setTimeout(() => {
           Alert.alert('Error', errorMessage, [{ text: 'OK' }]);
         }, 100);
@@ -244,7 +245,6 @@ function AppContent() {
           errorLower.includes('email already') ||
           errorLower.includes('already registered');
         
-        // Use setTimeout to ensure Alert is shown after current execution completes
         setTimeout(() => {
           if (isUserExistsError) {
             Alert.alert('Error', 'User already exist', [{ text: 'OK' }]);
@@ -263,7 +263,6 @@ function AppContent() {
         errorLower.includes('email already') ||
         errorLower.includes('already registered');
       
-      // Use setTimeout to ensure Alert is shown after current execution completes
       setTimeout(() => {
         if (isUserExistsError) {
           Alert.alert('Error', 'User already exist', [{ text: 'OK' }]);
@@ -279,6 +278,7 @@ function AppContent() {
   const [signupEmail, setSignupEmail] = useState('');
   const [forgotPasswordEmail, setForgotPasswordEmail] = useState('');
   const [editingPost, setEditingPost] = useState(null);
+  const [selectedGroup, setSelectedGroup] = useState(null);
   const [profileRefreshTrigger, setProfileRefreshTrigger] = useState(0);
   const [onboardingStep, setOnboardingStep] = useState(1);
   const [onboardingSlideAnim] = useState(new Animated.Value(0));
@@ -341,7 +341,6 @@ function AppContent() {
       
       if (verifyResetPasswordOTP.fulfilled.match(result)) {
         console.log('✅ Forgot password OTP verified successfully!');
-        // Store the OTP to use in reset password API
         setResetOTP(otp);
         dispatch(setCurrentScreen('createNewPassword'));
       } else if (verifyResetPasswordOTP.rejected.match(result)) {
@@ -359,7 +358,7 @@ function AppContent() {
 
   // Create new password handlers
   const handleCreatePasswordContinue = () => {
-    setResetOTP(null); // Clear OTP after successful reset
+    setResetOTP(null); 
     dispatch(setCurrentScreen('resetSuccess'));
   };
 
@@ -400,7 +399,6 @@ function AppContent() {
         dispatch(setCurrentScreen('profile'));
       } else if (updateUserProfile.rejected.match(result)) {
         console.log(' Profile update failed:', result.payload);
-        // Extract error message from payload
         let errorMessage = 'Profile update failed';
         if (typeof result.payload === 'string') {
           errorMessage = result.payload;
@@ -442,7 +440,6 @@ function AppContent() {
     dispatch(setCurrentScreen('home'));
   };
 
-  // Centralized handler for updating comment counts from CommentScreen
   const handleCommentCountUpdate = useCallback((postId, newCommentCount) => {
     console.log(' App.js: Updating comment count for post:', postId, 'to:', newCommentCount);
     dispatch(updateCommentCount({ postId, count: newCommentCount }));
@@ -453,7 +450,6 @@ function AppContent() {
     dispatch(setCurrentScreen('home'));
   };
 
-  // Comment handlers
   const handleViewComments = (post) => {
     console.log(' View comments for post:', post);
     setSelectedPost(post);
@@ -464,15 +460,12 @@ function AppContent() {
     dispatch(setCurrentScreen('home'));
   };
 
-  // Reset success handlers
   const handleResetSuccessDone = () => {
-    // Navigate to login screen instead of home
     setResetOTP(null);
     setForgotPasswordEmail('');
     dispatch(setCurrentScreen('login'));
   };
 
-  // Fill profile handlers
   const handleFillProfileContinue = async (data) => {
     try {
       console.log('🔧 Profile update started with:', data);
@@ -482,11 +475,9 @@ function AppContent() {
       if (updateUserProfile.fulfilled.match(result)) {
         console.log('Profile updated successfully!');
         
-        // After profile completion, go to follow someone screen
         dispatch(setCurrentScreen('followSomeone'));
       } else if (updateUserProfile.rejected.match(result)) {
         console.log(' Profile update failed:', result.payload);
-        // Extract error message from payload
         let errorMessage = 'Profile update failed';
         if (typeof result.payload === 'string') {
           errorMessage = result.payload;
@@ -503,7 +494,6 @@ function AppContent() {
     }
   };
 
-  // Follow someone handlers
   const handleFollowSomeoneContinue = (data) => {
     console.log('Following data:', data);
     
@@ -525,7 +515,6 @@ function AppContent() {
   const handleLogout = async () => {
     console.log(' Logging out user');
     try {
-      // Disconnect socket before logging out
       socketService.disconnect();
       await dispatch(logoutUser());
       navigateToWelcomeImmediate();
@@ -535,7 +524,6 @@ function AppContent() {
     }
   };
 
-  // Profile navigation handler
   const handleProfilePress = () => {
     console.log(' Profile button pressed');
     dispatch(setSelectedUserId(null));
@@ -552,7 +540,6 @@ function AppContent() {
     dispatch(setFollowSomeoneSource('onboarding'));
     dispatch(setCurrentScreen('followSomeone'));
   };
-  // User profile navigation handler
   const handleUserProfilePress = (user) => {
     console.log('User profile pressed:', user._id);
     
@@ -564,7 +551,6 @@ function AppContent() {
     dispatch(setCurrentScreen('profile'));
   };
 
-  // Country selection handlers
   const handleCountrySelectContinue = async (selectedCountry) => {
     try {
       const result = await dispatch(updateUserCountry(selectedCountry));
@@ -585,7 +571,6 @@ function AppContent() {
     }
   };
 
-  // Back navigation handlers
   const handleBackToWelcome = () => {
     navigateToWelcomeImmediate();
   };
@@ -959,7 +944,145 @@ function AppContent() {
             onPostUpdated={handlePostUpdated}
             onActivityPress={() => dispatch(setCurrentScreen('activity'))}
             onInboxPress={() => dispatch(setCurrentScreen('inbox'))}
+            onGroupsPress={() => dispatch(setCurrentScreen('groups'))}
             onUserProfilePress={handleUserProfilePress}
+          />
+        );
+      case 'groups':
+        return (
+          <GroupsScreen
+            onBack={() => dispatch(setCurrentScreen('home'))}
+            onCreateGroup={() => dispatch(setCurrentScreen('createGroup'))}
+            onGroupPress={(group) => {
+              setSelectedGroup(group);
+              dispatch(setCurrentScreen('groupDetail'));
+            }}
+          />
+        );
+      case 'createGroup':
+        return (
+          <CreateGroupScreen
+            onBack={() => dispatch(setCurrentScreen('groups'))}
+            onCreateGroup={(group) => {
+              if (group) {
+                setSelectedGroup(group);
+                dispatch(setCurrentScreen('groupDetail'));
+              } else {
+                dispatch(setCurrentScreen('groups'));
+              }
+            }}
+          />
+        );
+      case 'createGroupPost':
+        return (
+          <CreateGroupPostScreen
+            group={selectedGroup}
+            onBack={() => dispatch(setCurrentScreen('groupDetail'))}
+            onPostCreated={() => {
+              // Post will be added to state via Redux, just refresh
+              if (selectedGroup?._id || selectedGroup?.id) {
+                // Refresh handled by Redux state update
+              }
+            }}
+          />
+        );
+      case 'groupDetail':
+        return (
+          <GroupDetailScreen
+            group={selectedGroup}
+            onBack={() => {
+              setSelectedGroup(null);
+              dispatch(setCurrentScreen('groups'));
+            }}
+            onCreatePost={() => {
+              dispatch(setCurrentScreen('createGroupPost'));
+            }}
+            onPostPress={(post) => {
+              // TODO: Navigate to post detail
+              console.log('View group post:', post);
+            }}
+            onCommentPress={({ groupId, postId, post }) => {
+              setSelectedGroup({ ...selectedGroup, _groupId: groupId, _postId: postId, _post: post });
+              dispatch(setCurrentScreen('groupComments'));
+            }}
+            onMembersPress={() => {
+              dispatch(setCurrentScreen('groupMembers'));
+            }}
+            onSettingsPress={() => {
+              dispatch(setCurrentScreen('groupSettings'));
+            }}
+            onJoinRequestsPress={() => {
+              dispatch(setCurrentScreen('groupJoinRequests'));
+            }}
+            onInviteLinksPress={() => {
+              dispatch(setCurrentScreen('groupInviteLinks'));
+            }}
+            onGroupDeleted={() => {
+              setSelectedGroup(null);
+              dispatch(setCurrentScreen('groups'));
+            }}
+            userRole={selectedGroup?.userRole || 'member'}
+            currentUserId={currentUserId}
+          />
+        );
+      case 'groupComments':
+        return (
+          <GroupCommentScreen
+            groupId={selectedGroup?._groupId || selectedGroup?._id || selectedGroup?.id}
+            postId={selectedGroup?._postId}
+            post={selectedGroup?._post}
+            onBack={() => dispatch(setCurrentScreen('groupDetail'))}
+            onUserPress={handleUserProfilePress}
+            userRole={selectedGroup?.userRole || 'member'}
+            currentUserId={currentUserId}
+          />
+        );
+      case 'groupSettings':
+        return (
+          <GroupSettingsScreen
+            group={selectedGroup}
+            userRole={selectedGroup?.userRole || 'member'}
+            onBack={() => dispatch(setCurrentScreen('groupDetail'))}
+            onGroupUpdated={(updatedGroup) => {
+              setSelectedGroup(updatedGroup);
+              dispatch(setCurrentScreen('groupDetail'));
+            }}
+            onGroupDeleted={() => {
+              setSelectedGroup(null);
+              dispatch(setCurrentScreen('groups'));
+            }}
+          />
+        );
+      case 'groupJoinRequests':
+        return (
+          <JoinRequestsScreen
+            group={selectedGroup}
+            onBack={() => dispatch(setCurrentScreen('groupDetail'))}
+            onUserPress={handleUserProfilePress}
+          />
+        );
+      case 'groupInviteLinks':
+        return (
+          <InviteLinksScreen
+            group={selectedGroup}
+            onBack={() => dispatch(setCurrentScreen('groupDetail'))}
+          />
+        );
+      case 'groupMembers':
+        return (
+          <GroupMembersScreen
+            group={selectedGroup}
+            members={selectedGroup?.members || []}
+            onBack={() => dispatch(setCurrentScreen('groupDetail'))}
+            onMemberPress={(member) => {
+              // TODO: Navigate to user profile
+              console.log('View member:', member);
+            }}
+            onRoleChange={(member, role, status) => {
+              // TODO: Update member role/status
+              console.log('Change role:', member, role, status);
+            }}
+            userRole={selectedGroup?.userRole || 'member'}
           />
         );
       case 'activity':

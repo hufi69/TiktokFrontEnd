@@ -643,13 +643,13 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
 
   return (
     <SafeAreaView style={styles.container} edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['top']}>
-      <View style={styles.topBar}>
-        <TouchableOpacity onPress={onBack} hitSlop={8}>
-          <Icon name="chevron-left" size={22} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Comments</Text>
-        <View style={{ width: 22 }} />
-      </View>
+        <View style={styles.topBar}>
+          <TouchableOpacity onPress={onBack} hitSlop={8}>
+            <Icon name="chevron-left" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Comments</Text>
+          <View style={{ width: 22 }} />
+        </View>
 
       <View style={{ flex: 1 }}>
         <FlashList
@@ -695,41 +695,41 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
           </View>
         </Modal>
       </View>
-      
+
       {(() => {
         const composerContent = (
-          <View style={[
-            styles.composer, 
+        <View style={[
+          styles.composer, 
             replyTo && styles.composerReply
-          ]}>
-            {replyTo ? (
-              <View style={styles.replyPill}>
-                <Text numberOfLines={1} style={styles.replyPillText}>Replying to {replyTo.user?.fullName || replyTo.user?.userName}</Text>
-                <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
-                  <Icon name="times" size={16} color={colors.textLight} />
-                </TouchableOpacity>
-              </View>
-            ) : null}
-
-            <View style={[styles.inputRow, replyTo && styles.inputRowReply]}>
-              <TextInput
-                ref={inputRef}
-                value={input}
-                onChangeText={setInput}
-                placeholder={replyTo ? 'Write a reply…' : 'Your comment…'}
-                placeholderTextColor={colors.textLight}
-                style={styles.input}
-                multiline
-                maxLength={1000}
-                returnKeyType={'send'}
-                onSubmitEditing={handleSend}
-                blurOnSubmit={false}
-              />
-              <TouchableOpacity onPress={handleSend} disabled={!input.trim()} style={[styles.postBtn, !input.trim() && { opacity: 0.5 }]}>
-                <Text style={styles.postBtnTxt}>Post</Text>
+        ]}>
+          {replyTo ? (
+            <View style={styles.replyPill}>
+              <Text numberOfLines={1} style={styles.replyPillText}>Replying to {replyTo.user?.fullName || replyTo.user?.userName}</Text>
+              <TouchableOpacity onPress={() => setReplyTo(null)} hitSlop={8}>
+                <Icon name="times" size={16} color={colors.textLight} />
               </TouchableOpacity>
             </View>
+          ) : null}
+
+          <View style={[styles.inputRow, replyTo && styles.inputRowReply]}>
+            <TextInput
+              ref={inputRef}
+              value={input}
+              onChangeText={setInput}
+              placeholder={replyTo ? 'Write a reply…' : 'Your comment…'}
+              placeholderTextColor={colors.textLight}
+              style={styles.input}
+              multiline
+              maxLength={1000}
+              returnKeyType={'send'}
+              onSubmitEditing={handleSend}
+              blurOnSubmit={false}
+            />
+            <TouchableOpacity onPress={handleSend} disabled={!input.trim()} style={[styles.postBtn, !input.trim() && { opacity: 0.5 }]}>
+              <Text style={styles.postBtnTxt}>Post</Text>
+            </TouchableOpacity>
           </View>
+        </View>
         );
 
         return Platform.OS === 'ios' ? (
@@ -738,7 +738,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
             keyboardVerticalOffset={0}
           >
             {composerContent}
-          </KeyboardAvoidingView>
+      </KeyboardAvoidingView>
         ) : (
           composerContent
         );

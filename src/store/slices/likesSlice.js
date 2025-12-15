@@ -22,9 +22,6 @@ export const togglePostLike = createAsyncThunk(
       const isCurrentlyLiked = currentLike?.isLiked || false;
       const storedLikeId = currentLike?.likeId;
 
-     
-
-      // Get likeId if needed for unlike operation
       let effectiveLikeId = storedLikeId;
       
       if (isCurrentlyLiked && !effectiveLikeId) {
@@ -32,35 +29,162 @@ export const togglePostLike = createAsyncThunk(
         const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
         const likesData = await likesApi.getPostLikes(postId);
         const likes = likesData.data?.likes || [];
-        const userLike = likes.find(like => 
-          like.user?._id === currentUserId || like.user?.id === currentUserId
-        );
-        effectiveLikeId = userLike?._id;
+        const userLike = likes.find(like => {
+          const likeUserId = like.user?._id || like.user?.id;
+          return likeUserId && likeUserId.toString() === currentUserId?.toString();
+        });
+        effectiveLikeId = userLike?._id || userLike?.id;
         
         if (!effectiveLikeId) {
-          throw new Error('Could not find likeId for unlike operation');
+          // If likeId not found but state says liked, sync state from backend
+          console.log('LikeId not found for unlike - syncing state...');
+          if (likes.length === 0) {
+            // No likes found, post is not actually liked
+            return {
+              postId,
+              isLiked: false,
+              count: 0,
+              likeId: null,
+            };
+          }
+      
+          return {
+            postId,
+            isLiked: false,
+            count: likes.length,
+            likeId: null,
+          };
         }
       }
-
-      // Call API directly
       if (!isCurrentlyLiked) {
-        // Like the post
-        const data = await likesApi.likePost(postId);
-        return {
-          postId,
-          isLiked: true,
-          count: currentCount + 1,
-          likeId: data.data?.like?._id,
-        };
+    
+        try {
+          const data = await likesApi.likePost(postId);
+          return {
+            postId,
+            isLiked: true,
+            count: currentCount + 1,
+            likeId: data.data?.like?._id,
+          };
+        } catch (likeError) {
+          // Handle duplicate/already liked error - state is out of sync
+          const errorMessage = likeError.message || '';
+          const isDuplicateError = errorMessage.toLowerCase().includes('duplicate') || 
+                                  errorMessage.toLowerCase().includes('already liked') ||
+                                  errorMessage.toLowerCase().includes('post already liked');
+          
+          if (isDuplicateError) {
+         
+            console.log('Duplicate like detected - syncing state from backend...');
+            const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
+            const likesData = await likesApi.getPostLikes(postId);
+            const likes = likesData.data?.likes || [];
+            const userLike = likes.find(like => {
+              const likeUserId = like.user?._id || like.user?.id;
+              return likeUserId && likeUserId.toString() === currentUserId?.toString();
+            });
+            
+            if (userLike) {
+    
+              return {
+                postId,
+                isLiked: true,
+                count: likes.length,
+                likeId: userLike._id || userLike.id,
+              };
+            } else {
+          
+              return {
+                postId,
+                isLiked: true,
+                count: likes.length || currentCount,
+                likeId: null,
+              };
+            }
+          }
+       
+          throw likeError;
+        }
       } else {
-        // Unlike the post
-        await likesApi.unlikePost(effectiveLikeId);
-        return {
-          postId,
-          isLiked: false,
-          count: Math.max(0, currentCount - 1),
-          likeId: null,
-        };
+     
+        if (!effectiveLikeId) {
+        
+          const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
+          const likesData = await likesApi.getPostLikes(postId);
+          const likes = likesData.data?.likes || [];
+          const userLike = likes.find(like => {
+            const likeUserId = like.user?._id || like.user?.id;
+            return likeUserId && likeUserId.toString() === currentUserId?.toString();
+          });
+          effectiveLikeId = userLike?._id || userLike?.id;
+        }
+        
+        if (effectiveLikeId) {
+          try {
+            await likesApi.unlikePost(effectiveLikeId);
+            return {
+              postId,
+              isLiked: false,
+              count: Math.max(0, currentCount - 1),
+              likeId: null,
+            };
+          } catch (unlikeError) {
+            // If unlike fails, sync state from backend
+            console.log('Unlike failed - syncing state from backend...', unlikeError.message);
+            const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
+            const likesData = await likesApi.getPostLikes(postId);
+            const likes = likesData.data?.likes || [];
+            const userLike = likes.find(like => {
+              const likeUserId = like.user?._id || like.user?.id;
+              return likeUserId && likeUserId.toString() === currentUserId?.toString();
+            });
+            
+            if (!userLike) {
+              return {
+                postId,
+                isLiked: false,
+                count: likes.length,
+                likeId: null,
+              };
+            } else {
+              // Still liked, sync with correct likeId
+              return {
+                postId,
+                isLiked: true,
+                count: likes.length,
+                likeId: userLike._id || userLike.id,
+              };
+            }
+          }
+        } else {
+      
+          console.log('LikeId not found - syncing state from backend...');
+          const currentUserId = state.auth?.user?._id || state.auth?.user?.id;
+          const likesData = await likesApi.getPostLikes(postId);
+          const likes = likesData.data?.likes || [];
+          const userLike = likes.find(like => {
+            const likeUserId = like.user?._id || like.user?.id;
+            return likeUserId && likeUserId.toString() === currentUserId?.toString();
+          });
+          
+          if (!userLike) {
+            // Not actually liked, update state
+            return {
+              postId,
+              isLiked: false,
+              count: likes.length,
+              likeId: null,
+            };
+          } else {
+            // Still liked, update with correct likeId
+            return {
+              postId,
+              isLiked: true,
+              count: likes.length,
+              likeId: userLike._id || userLike.id,
+            };
+          }
+        }
       }
 
     } catch (error) {
@@ -217,22 +341,29 @@ const likesSlice = createSlice({
         const payload = action.meta.arg;
         const postId = typeof payload === 'string' ? payload : payload.postId;
         const current = state.posts[postId];
-
-        // Revert optimistic update on failure
-        if (current) {
+        const errorMessage = action.payload || '';
+        const isDuplicateError = errorMessage.toLowerCase().includes('duplicate') || 
+                                errorMessage.toLowerCase().includes('already liked') ||
+                                errorMessage.toLowerCase().includes('post already liked') ||
+                                errorMessage.toLowerCase().includes('could not find likeid');
+        
+        if (current && !isDuplicateError) {
+   
           current.isLiked = !current.isLiked;
           current.count = current.isLiked ? current.count + 1 : Math.max(0, current.count - 1);
         }
-
         delete state.pending[postId];
-        state.error = action.payload;
+
+        if (!isDuplicateError) {
+          state.error = action.payload;
+        }
       })
       
-      // Toggle comment like
+      
       .addCase(toggleCommentLike.pending, (state, action) => {
         const commentId = action.meta.arg;
 
-        // Only set pending state, no optimistic update
+        
         state.pending[commentId] = true;
       })
       .addCase(toggleCommentLike.fulfilled, (state, action) => {

@@ -15,6 +15,9 @@ export * from './StoryScreen';
 // Profile Screens
 export * from './profile';
 
+// Groups Screens
+export * from './GroupsScreen';
+
 // Standalone Screens
 export { default as SplashScreen } from './SplashScreen';
 export { default as OnboardingScreen } from './OnboardingScreen';

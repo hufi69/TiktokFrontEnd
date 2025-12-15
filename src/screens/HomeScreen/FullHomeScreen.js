@@ -27,7 +27,7 @@ import { StoryViewer } from '../StoryScreen/components';
 import { API_CONFIG } from '../../config/api';
 import { buildStories, insertNewStory } from '../../utils/api/postUtils';
 
-const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments, onEditPost, onPostUpdated, onActivityPress, onInboxPress, onUserProfilePress }) => {
+const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments, onEditPost, onPostUpdated, onActivityPress, onInboxPress, onGroupsPress, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { posts: reduxPosts, isLoading } = useAppSelector(state => state.posts);
   const { user } = useAppSelector(state => state.auth);
@@ -443,9 +443,15 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
         <View style={styles.headerActions}>
           <TouchableOpacity 
             style={styles.headerButton}
+            onPress={() => onGroupsPress?.()}
+          >
+            <Icon name="users" size={24} color={colors.pink} />
+          </TouchableOpacity>
+          <TouchableOpacity 
+            style={styles.headerButton}
             onPress={() => onActivityPress?.()}
           >
-            <Icon name="heart-o" size={24} color={colors.text} />
+            <Icon name="heart-o" size={24} color={colors.pink} />
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerButton}
@@ -468,7 +474,7 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
               );
             }}
           >
-            <Icon name="ellipsis-v" size={20} color={colors.text} />
+            <Icon name="ellipsis-v" size={20} color={colors.pink} />
           </TouchableOpacity>
         </View>
       </View>
