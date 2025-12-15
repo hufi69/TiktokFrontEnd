@@ -19,7 +19,7 @@ import { fetchUserGroups, fetchGroups, searchGroups, joinGroup } from '../../sto
 
 const GroupsScreen = ({ onBack, onCreateGroup, onGroupPress }) => {
   const dispatch = useAppDispatch();
-  const { userGroups, groups, isLoading } = useAppSelector(state => state.groups);
+  const { userGroups, groups, groupMembers, isLoading } = useAppSelector(state => state.groups);
   const [activeTab, setActiveTab] = useState('myGroups'); // 'myGroups' | 'discover'
   const [refreshing, setRefreshing] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -106,17 +106,18 @@ const GroupsScreen = ({ onBack, onCreateGroup, onGroupPress }) => {
     const isJoined = joinedGroups.has(groupId);
     const isJoining = joiningGroupId === groupId;
     const showJoinButton = activeTab === 'discover' && !isJoined;
+    const actualMemberCount = groupMembers[groupId]?.length || item.memberCount || 0;
 
     return (
       <GroupItem
-        group={item}
+        group={{ ...item, memberCount: actualMemberCount }}
         onPress={() => onGroupPress?.(item)}
         isJoined={isJoined}
         onJoin={showJoinButton ? handleJoinGroup : undefined}
         joining={isJoining}
       />
     );
-  }, [onGroupPress, activeTab, joinedGroups, joiningGroupId, handleJoinGroup]);
+  }, [onGroupPress, activeTab, joinedGroups, joiningGroupId, handleJoinGroup, groupMembers]);
 
   const renderEmptyState = () => (
     <View style={styles.emptyContainer}>

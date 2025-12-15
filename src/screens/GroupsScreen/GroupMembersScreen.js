@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -13,23 +13,38 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { colors, spacing, radius } from '../../constants/theme';
 import { GroupMemberItem } from './components';
+import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
+import { fetchGroupMembers } from '../../store/slices/groupsSlice';
 
 const GroupMembersScreen = ({ 
   group, 
-  members, 
+  members: initialMembers, 
   onBack, 
   onMemberPress, 
   onRoleChange,
   userRole 
 }) => {
+  const dispatch = useAppDispatch();
+  const groupId = group?._id || group?.id;
+  const { groupMembers, isLoading } = useAppSelector(state => state.groups);
+  const members = groupId ? (groupMembers[groupId] || initialMembers || []) : (initialMembers || []);
+  
   const [refreshing, setRefreshing] = useState(false);
   const [filter, setFilter] = useState('all'); // 'all' | 'admin' | 'moderator' | 'member'
 
+  useEffect(() => {
+    if (groupId) {
+      dispatch(fetchGroupMembers({ groupId }));
+    }
+  }, [groupId, dispatch]);
+
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
-    // TODO: Refresh members
-    setTimeout(() => setRefreshing(false), 1000);
-  }, []);
+    if (groupId) {
+      await dispatch(fetchGroupMembers({ groupId }));
+    }
+    setRefreshing(false);
+  }, [groupId, dispatch]);
 
   const handleRoleChange = useCallback((member) => {
     if (!onRoleChange) return;

@@ -50,13 +50,12 @@ const GroupDetailScreen = ({
   const groupId = group?._id || group?.id;
   const posts = groupId ? (groupPosts[groupId] || []) : [];
   const members = groupId ? (groupMembers[groupId] || []) : [];
+  const actualMemberCount = members.length > 0 ? members.length : (group?.memberCount || 0);
   const [refreshing, setRefreshing] = useState(false);
   const [isMember, setIsMember] = useState(true);
   const [joining, setJoining] = useState(false);
   const [showMenu, setShowMenu] = useState(false);
   const [deleting, setDeleting] = useState(false);
-  
-  // Get current user's membership role
   const currentUserMember = members.find(m => {
     const memberUserId = m.user?._id || m.user?.id || m.user;
     const currentUserId = user?._id || user?.id;
@@ -75,8 +74,7 @@ const GroupDetailScreen = ({
       }
     }
   }, [groupId, dispatch, effectiveIsMember]);
-
-  // Debug: 
+// for the debug 
   useEffect(() => {
     if (groupId) {
       console.log('Group Detail - User Role Detection:', {
@@ -205,7 +203,7 @@ const GroupDetailScreen = ({
         <View style={styles.stats}>
           <View style={styles.statItem}>
             <Icon name="users" size={18} color={colors.pink} />
-            <Text style={styles.statValue}>{group?.memberCount || 0}</Text>
+            <Text style={styles.statValue}>{actualMemberCount}</Text>
             <Text style={styles.statLabel}>Members</Text>
           </View>
           <View style={styles.statItem}>
