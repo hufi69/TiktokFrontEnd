@@ -31,6 +31,8 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
   const dispatch = useAppDispatch();
   const { posts: reduxPosts, isLoading } = useAppSelector(state => state.posts);
   const { user } = useAppSelector(state => state.auth);
+  const unreadNotificationCount = useAppSelector(state => state.ui.unreadNotificationCount);
+  const unreadInboxCount = useAppSelector(state => state.ui.unreadInboxCount);
   const insets = useSafeAreaInsets();
   console.log('FullHomeScreen - User:', user);
   console.log('FullHomeScreen - Is loading:', isLoading);
@@ -451,7 +453,16 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
             style={styles.headerButton}
             onPress={() => onActivityPress?.()}
           >
-            <Icon name="heart-o" size={24} color={colors.pink} />
+            <View style={styles.notificationIconContainer}>
+              <Icon name="heart-o" size={24} color={colors.pink} />
+              {unreadNotificationCount > 0 && (
+                <View style={styles.notificationBadge}>
+                  <Text style={styles.notificationBadgeText}>
+                    {unreadNotificationCount > 9 ? '9+' : unreadNotificationCount}
+                  </Text>
+                </View>
+              )}
+            </View>
           </TouchableOpacity>
           <TouchableOpacity 
             style={styles.headerButton}
@@ -552,7 +563,7 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
         }}
       />
 
-      <BottomNavigation activeTab={activeTab} onTabPress={handleTabPress} />
+      <BottomNavigation activeTab={activeTab} onTabPress={handleTabPress} unreadCount={unreadInboxCount} />
 
       {/* Story Viewer Modal */}
       <StoryViewer
@@ -598,6 +609,28 @@ const styles = StyleSheet.create({
   headerButton: {
     padding: spacing.s,
     borderRadius: radius.l,
+  },
+  notificationIconContainer: {
+    position: 'relative',
+  },
+  notificationBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -8,
+    backgroundColor: '#FF3040',
+    borderRadius: 10,
+    minWidth: 18,
+    height: 18,
+    paddingHorizontal: 5,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: colors.bg,
+  },
+  notificationBadgeText: {
+    color: '#fff',
+    fontSize: 10,
+    fontWeight: '700',
   },
 
   storiesContainer: {

@@ -15,7 +15,8 @@ import BackButton from '../components/common/BackButton';
 import { colors, spacing } from '../constants/theme';
 import { CONFIG } from '../config';
 import { getUserChats } from '../services/api/chatApi';
-import { useAppSelector } from '../hooks/hooks';
+import { useAppSelector, useAppDispatch } from '../hooks/hooks';
+import { setUnreadInboxCount } from '../store/slices/uiSlice';
 
 // Default avatar
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
@@ -26,7 +27,7 @@ const getAvatarUrl = (profilePicture) => {
   if (/^https?:\/\//.test(profilePicture)) {
     return profilePicture;
   }
-  return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
+  return `${CONFIG.API_BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 // Helper function to format timestamp
@@ -64,6 +65,7 @@ const formatTimestamp = (dateString) => {
 };
 
 const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) => {
+  const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
   const [chats, setChats] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -95,6 +97,13 @@ const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) =
       
           const lastMessageText = chat.lastMessage?.text || '';
           const lastMessageTime = chat.lastMessage?.sentAt || chat.updatedAt || chat.createdAt;
+          const lastMessageSenderId = chat.lastMessage?.senderId;
+          const isLastMessageFromOther = lastMessageSenderId && 
+            lastMessageSenderId !== currentUser?._id && 
+            lastMessageSenderId !== currentUser?.id;
+          
+          const unreadCount = chat.unreadCount || (isLastMessageFromOther ? 1 : 0);
+          const isRead = !isLastMessageFromOther;
 
           return {
             id: chat._id,
@@ -109,15 +118,19 @@ const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) =
             },
             lastMessage: lastMessageText || 'No messages yet',
             timestamp: formatTimestamp(lastMessageTime),
-            unreadCount: 0, // TODO: Implement unread count from backend
-            isRead: true, // TODO: Implement read status from backend
+            unreadCount: unreadCount,
+            isRead: isRead,
           };
         });
 
         setChats(transformedChats);
+        
+        const totalUnread = transformedChats.reduce((sum, chat) => sum + (chat.unreadCount || 0), 0);
+        dispatch(setUnreadInboxCount(totalUnread));
       } catch (error) {
         console.error('Error fetching chats:', error);
         setChats([]);
+        dispatch(setUnreadInboxCount(0));
       } finally {
         setIsLoading(false);
       }
@@ -166,7 +179,9 @@ const InboxScreen = ({ onBack, onUserPress, onMessagePress, onCreateMessage }) =
           </Text>
           {item.unreadCount > 0 && (
             <View style={styles.unreadBadge}>
-              <Text style={styles.unreadBadgeText}>{item.unreadCount}</Text>
+              <Text style={styles.unreadBadgeText}>
+                {item.unreadCount > 99 ? '99+' : item.unreadCount}
+              </Text>
             </View>
           )}
         </View>

@@ -43,7 +43,7 @@ const LikesModal = ({ visible, onClose, postId, onUserPress }) => {
         ? user.profilePicture
         : (() => {
             const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
-            return `${baseUrl}/public/img/users/${user.profilePicture}`;
+            return `${baseUrl}/public/uploads/users/${user.profilePicture}`;
           })()
       : AVATAR_FALLBACK;
 

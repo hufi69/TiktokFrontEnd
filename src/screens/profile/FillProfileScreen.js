@@ -62,7 +62,7 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, i
     }
     // If it's just a filename, construct the full URL
     if (typeof profilePicture === 'string') {
-      return { uri: `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}` };
+      return { uri: `${API_CONFIG.BASE_URL}/public/uploads/users/${profilePicture}` };
     }
     return null;
   };

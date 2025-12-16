@@ -17,6 +17,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import BackButton from '../components/common/BackButton';
+import ImagePreviewModal from '../components/ImagePreviewModal';
 import { colors, spacing } from '../constants/theme';
 import { CONFIG } from '../config';
 import socketService from '../services/socket/socketService';
@@ -30,7 +31,7 @@ const DEFAULT_AVATAR =
 const getAvatarUrl = (profilePicture) => {
   if (!profilePicture) return DEFAULT_AVATAR;
   if (/^https?:\/\//.test(profilePicture)) return profilePicture;
-  return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
+  return `${CONFIG.API_BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId = null }) => {
@@ -45,6 +46,7 @@ const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId 
   const [isLoadingMessages, setIsLoadingMessages] = useState(false);
   const [selectedMessage, setSelectedMessage] = useState(null);
   const [showDeleteModal, setShowDeleteModal] = useState(false);
+  const [previewImage, setPreviewImage] = useState(null);
 
   const flatListRef = useRef(null);
   const typingTimeoutRef = useRef(null);
@@ -139,7 +141,7 @@ const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId 
           
           // Get attachment image if available
           const attachment = msg.attachments && msg.attachments.length > 0 
-            ? `${CONFIG.API_BASE_URL}/public/uploads/${msg.attachments[0].filename}`
+            ? `${CONFIG.API_BASE_URL}/public/uploads/chats/${msg.attachments[0].filename}`
             : null;
 
           const messageDate = new Date(msg.createdAt || msg.timestamp);
@@ -490,7 +492,12 @@ const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId 
                 {item.sender?.userName || item.sender?.fullName}
               </Text>
               {item.image && (
-                <Image source={{ uri: item.image }} style={styles.messageImage} />
+                <TouchableOpacity
+                  onPress={() => setPreviewImage(item.image)}
+                  activeOpacity={0.9}
+                >
+                  <Image source={{ uri: item.image }} style={styles.messageImage} />
+                </TouchableOpacity>
               )}
               {item.text && (
                 <View style={styles.receivedBubble}>
@@ -514,7 +521,12 @@ const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId 
                 {item.sender?.userName || item.sender?.fullName || 'You'}
               </Text>
               {item.image && (
-                <Image source={{ uri: item.image }} style={styles.messageImage} />
+                <TouchableOpacity
+                  onPress={() => setPreviewImage(item.image)}
+                  activeOpacity={0.9}
+                >
+                  <Image source={{ uri: item.image }} style={styles.messageImage} />
+                </TouchableOpacity>
               )}
               {item.text && (
                 <View style={styles.sentBubble}>
@@ -591,6 +603,16 @@ const ChatScreen = ({ onBack, user, initialMessages = [], chatId: initialChatId 
         <View style={styles.typingIndicator}>
           <Text style={styles.typingText}>{user?.userName || user?.fullName} is typing...</Text>
         </View>
+      )}
+
+      {/* IMAGE PREVIEW MODAL */}
+      {previewImage && (
+        <ImagePreviewModal
+          visible={!!previewImage}
+          images={[previewImage]}
+          currentIndex={0}
+          onClose={() => setPreviewImage(null)}
+        />
       )}
 
       {/* DELETE MESSAGE MODAL */}

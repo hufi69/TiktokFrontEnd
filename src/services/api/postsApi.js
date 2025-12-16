@@ -42,17 +42,27 @@ export async function createPost(postData) {
     formData.append('data', JSON.stringify(payload));
 
     if (Array.isArray(postData.images)) {
-      postData.images.forEach((image, idx) => {
-        if (image?.uri) {
-          const type = image.type || 'image/jpeg';
+      postData.images.forEach((mediaItem, idx) => {
+        if (mediaItem?.uri) {
+          const type = mediaItem.type || 'image/jpeg';
           const isVideo = typeof type === 'string' && type.startsWith('video/');
           const fallbackName = isVideo ? `video_${idx}.mp4` : `image_${idx}.jpg`;
+          const fileName = mediaItem.fileName || mediaItem.name || mediaItem.filename || fallbackName;
 
-          formData.append('images', {
-            uri: image.uri,
-            type,
-            name: image.fileName || image.name || image.filename || fallbackName,
-          });
+        
+          if (isVideo) {
+            formData.append('videos', {
+              uri: mediaItem.uri,
+              type,
+              name: fileName,
+            });
+          } else {
+            formData.append('images', {
+              uri: mediaItem.uri,
+              type,
+              name: fileName,
+            });
+          }
         }
       });
     }

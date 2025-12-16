@@ -38,6 +38,12 @@ const initialState = {
   // Keyboard state
   keyboardVisible: false,
   keyboardHeight: 0,
+  
+  // Notifications
+  unreadNotificationCount: 0,
+  
+  // Inbox
+  unreadInboxCount: 0,
 };
 
 const uiSlice = createSlice({
@@ -133,6 +139,28 @@ const uiSlice = createSlice({
       state.keyboardHeight = action.payload;
     },
     
+    // Notification actions
+    setUnreadNotificationCount: (state, action) => {
+      state.unreadNotificationCount = action.payload;
+    },
+    incrementNotificationCount: (state) => {
+      state.unreadNotificationCount += 1;
+    },
+    decrementNotificationCount: (state) => {
+      state.unreadNotificationCount = Math.max(0, state.unreadNotificationCount - 1);
+    },
+    resetNotificationCount: (state) => {
+      state.unreadNotificationCount = 0;
+    },
+    
+    // Inbox actions
+    setUnreadInboxCount: (state, action) => {
+      state.unreadInboxCount = action.payload;
+    },
+    resetInboxCount: (state) => {
+      state.unreadInboxCount = 0;
+    },
+    
     // Reset UI state
     resetUI: (state) => {
       state.currentScreen = 'splash';
@@ -152,6 +180,8 @@ const uiSlice = createSlice({
       state.isRefreshing = false;
       state.keyboardVisible = false;
       state.keyboardHeight = 0;
+      state.unreadNotificationCount = 0;
+      state.unreadInboxCount = 0;
     },
   },
 });
@@ -180,6 +210,12 @@ export const {
   setRefreshing,
   setKeyboardVisible,
   setKeyboardHeight,
+  setUnreadNotificationCount,
+  incrementNotificationCount,
+  decrementNotificationCount,
+  resetNotificationCount,
+  setUnreadInboxCount,
+  resetInboxCount,
   resetUI,
 } = uiSlice.actions;
 

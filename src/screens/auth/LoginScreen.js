@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Platform } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Platform, ActivityIndicator } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import BackButton from '../../components/common/BackButton';
@@ -8,7 +8,7 @@ import SocialButton from '../AuthScreen/components/SocialButton';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { colors } from '../../constants/theme';
 
-const LoginScreen = ({ onBack, onSocial, onSubmit, onGoToSignup, onForgetPassword }) => {
+const LoginScreen = ({ onBack, onSocial, onSubmit, onGoToSignup, onForgetPassword, isLoading = false }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -78,8 +78,16 @@ const LoginScreen = ({ onBack, onSocial, onSubmit, onGoToSignup, onForgetPasswor
               <Text style={styles.rememberText}>Remember me</Text>
             </TouchableOpacity>
 
-            <TouchableOpacity style={[styles.primaryButton, !isFormValid && styles.primaryButtonDisabled]} onPress={() => onSubmit && onSubmit({ email: email.trim(), password, remember })} disabled={!isFormValid}>
-              <Text style={[styles.primaryText, !isFormValid && styles.primaryTextDisabled]}>Login</Text>
+            <TouchableOpacity 
+              style={[styles.primaryButton, (!isFormValid || isLoading) && styles.primaryButtonDisabled]} 
+              onPress={() => onSubmit && onSubmit({ email: email.trim(), password, remember })} 
+              disabled={!isFormValid || isLoading}
+            >
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.bg} />
+              ) : (
+                <Text style={[styles.primaryText, !isFormValid && styles.primaryTextDisabled]}>Login</Text>
+              )}
             </TouchableOpacity>
 
             <TouchableOpacity style={styles.forgetPassword} onPress={onForgetPassword}>

@@ -21,7 +21,7 @@ const getAvatarUrl = (profilePicture) => {
   if (!profilePicture) return DEFAULT_AVATAR;
   if (/^https?:\/\//.test(profilePicture)) return profilePicture;
   const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
-  return `${baseUrl}/public/img/users/${profilePicture}`;
+  return `${baseUrl}/public/uploads/users/${profilePicture}`;
 };
 
 const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUserId, onPostUpdated, onEdit }) => {

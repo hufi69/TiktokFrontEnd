@@ -30,7 +30,7 @@ const getAvatarUrl = (profilePicture) => {
     return profilePicture;
   }
   // Otherwise, construct the full URL with base URL
-  return `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}`;
+  return `${API_CONFIG.BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpdate, onUserProfilePress }) => {

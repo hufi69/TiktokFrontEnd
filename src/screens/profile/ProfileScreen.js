@@ -6,6 +6,17 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { colors } from '../../constants/theme';
 import { API_CONFIG } from '../../config/api';
+import VideoPlayerModal from '../../components/VideoPlayerModal';
+import ImagePreviewModal from '../../components/ImagePreviewModal';
+
+// Try to import react-native-video for thumbnail generation
+let Video = null;
+try {
+  const videoModule = require('react-native-video');
+  Video = videoModule.default || videoModule;
+} catch (e) {
+  // Video not available
+}
 import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
 import {
   fetchUserProfile,
@@ -14,7 +25,8 @@ import {
   fetchUserPosts,
   followUser,
   unfollowUser,
-  checkIsFollowing
+  checkIsFollowing,
+  clearUserPosts
 } from '../../store/slices/userSlice';
 import { setSelectedChatUser, setCurrentScreen } from '../../store/slices/uiSlice';
 import BackButton from '../../components/common/BackButton';
@@ -26,7 +38,7 @@ const getAvatarUrl = (profilePicture) => {
   if (!profilePicture) return DEFAULT_AVATAR;
   return /^https?:\/\//.test(profilePicture)
     ? profilePicture
-    : `${API_CONFIG.BASE_URL}/public/img/users/${profilePicture}`;
+    : `${API_CONFIG.BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 const ProfileHeader = ({ user, onEditProfile, onSettings, isOwnProfile, onFollowToggle, onFollowSomeone, isFollowing, isLoading, onProfilePicturePress, onMessagePress }) => {
@@ -201,25 +213,118 @@ const UserListItem = ({ user, onPress, showFollowButton = false, isMutual = fals
 };
 
 const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isOwnProfile }) => {
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const [selectedImages, setSelectedImages] = useState(null);
+  const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+
+  const isVideo = (media) => {
+    if (!media) return false;
+    if (media.type === 'video' || media.type?.startsWith('video/')) return true;
+    const url = typeof media === 'string' ? media : media.url || '';
+    return url.includes('.mp4') || url.includes('.mov') || url.includes('.m4v') || url.includes('.webm');
+  };
+
   const renderPostItem = ({ item }) => {
-    const images = (item.media || [])
-      .filter(m => m.type === 'image' && m.url)
-      .map(m => `${API_CONFIG.BASE_URL}${m.url}`);
+    const media = item.media || [];
+    const images = media.filter(m => m.type === 'image' && m.url);
+    const videos = media.filter(m => isVideo(m) && m.url);
+    
+    // Get the first media item (image or video)
+    const firstMedia = images[0] || videos[0];
+    const hasMultipleMedia = media.length > 1;
+    
+    // Determine if first item is a video
+    const firstIsVideo = firstMedia && isVideo(firstMedia);
+    
+    // Get thumbnail or video URL
+    let mediaUri = null;
+    if (firstMedia) {
+      if (firstIsVideo) {
+        const thumbnail = firstMedia.thumbnailUrl || firstMedia.thumbnail;
+        mediaUri = thumbnail
+          ? (thumbnail.startsWith('http') ? thumbnail : `${API_CONFIG.BASE_URL}${thumbnail}`)
+          : null;
+        // If no thumbnail, we'll use Video component
+      } else {
+        mediaUri = firstMedia.url.startsWith('http') 
+          ? firstMedia.url 
+          : `${API_CONFIG.BASE_URL}${firstMedia.url}`;
+      }
+    }
+
+    const videoUrl = firstIsVideo && firstMedia?.url
+      ? (firstMedia.url.startsWith('http') ? firstMedia.url : `${API_CONFIG.BASE_URL}${firstMedia.url}`)
+      : null;
+
+    const canUseVideoThumbnail = Video && (typeof Video === 'function' || typeof Video === 'object');
+
+    const handlePress = () => {
+      if (firstIsVideo && videoUrl) {
+        // Open video player
+        setSelectedVideo(videoUrl);
+      } else if (images.length > 0) {
+        // Open image preview
+        const imageUrls = images.map(img => 
+          img.url.startsWith('http') ? img.url : `${API_CONFIG.BASE_URL}${img.url}`
+        );
+        setSelectedImages(imageUrls);
+        setSelectedImageIndex(0);
+      } else {
+        // Fallback to post press handler
+        onPostPress(item);
+      }
+    };
 
     return (
       <TouchableOpacity 
         style={styles.postGridItem} 
-        onPress={() => onPostPress(item)}
+        onPress={handlePress}
+        activeOpacity={0.9}
       >
-        <Image
-          source={{ 
-            uri: images.length > 0 
-              ? images[0] 
-              : 'https://via.placeholder.com/120x120?text=No+Image'
-          }}
-          style={styles.postGridImage}
-        />
-        {images.length > 1 && (
+        {firstIsVideo ? (
+          // Video post
+          <>
+            {mediaUri ? (
+              // Backend provided thumbnail
+              <Image
+                source={{ uri: mediaUri }}
+                style={styles.postGridImage}
+                resizeMode="cover"
+              />
+            ) : canUseVideoThumbnail && videoUrl ? (
+              // Use Video component to show first frame
+              <View style={styles.postGridVideoContainer}>
+                <Video
+                  source={{ uri: videoUrl }}
+                  style={styles.postGridImage}
+                  resizeMode="cover"
+                  paused={true}
+                  controls={false}
+                  muted={true}
+                  repeat={false}
+                />
+              </View>
+            ) : (
+              // Fallback placeholder
+              <View style={styles.postGridVideoPlaceholder}>
+                <Icon name="video-camera" size={24} color={colors.textLight} />
+              </View>
+            )}
+            <View style={styles.postGridVideoOverlay}>
+              <Icon name="play-circle" size={24} color="white" />
+            </View>
+          </>
+        ) : (
+          // Image post
+          <Image
+            source={{ 
+              uri: mediaUri || 'https://via.placeholder.com/120x120?text=No+Image'
+            }}
+            style={styles.postGridImage}
+            resizeMode="cover"
+          />
+        )}
+        {hasMultipleMedia && (
           <View style={styles.multipleImagesIndicator}>
             <Icon name="clone" size={12} color="#fff" />
           </View>
@@ -229,37 +334,57 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
   };
 
   return (
-    <FlatList
-      data={posts}
-      keyExtractor={(item) => item._id}
-      renderItem={renderPostItem}
-      numColumns={3}
-      columnWrapperStyle={styles.postGridRow}
-      contentContainerStyle={styles.postGridContainer}
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-      }
-      ListEmptyComponent={() => (
-        <View style={styles.emptyPostsContainer}>
-          <Icon name="camera" size={48} color={colors.muted} />
-          <Text style={styles.emptyPostsTitle}>
-            {isOwnProfile ? 'Create your first post' : 'No posts yet'}
-          </Text>
-          <Text style={styles.emptyPostsSubtitle}>
-            {isOwnProfile ? 'Give this space some love.' : 'This user hasn\'t posted anything yet.'}
-          </Text>
-          {isOwnProfile && onCreatePost && (
-            <TouchableOpacity 
-              style={styles.createPostButton}
-              onPress={onCreatePost}
-            >
-              <Text style={styles.createPostButtonText}>Create</Text>
-            </TouchableOpacity>
-          )}
-        </View>
-      )}
-    />
+    <>
+      <FlatList
+        data={posts}
+        keyExtractor={(item) => item._id}
+        renderItem={renderPostItem}
+        numColumns={3}
+        columnWrapperStyle={styles.postGridRow}
+        contentContainerStyle={styles.postGridContainer}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+        }
+        ListEmptyComponent={() => (
+          <View style={styles.emptyPostsContainer}>
+            <Icon name="camera" size={48} color={colors.muted} />
+            <Text style={styles.emptyPostsTitle}>
+              {isOwnProfile ? 'Create your first post' : 'No posts yet'}
+            </Text>
+            <Text style={styles.emptyPostsSubtitle}>
+              {isOwnProfile ? 'Give this space some love.' : 'This user hasn\'t posted anything yet.'}
+            </Text>
+            {isOwnProfile && onCreatePost && (
+              <TouchableOpacity 
+                style={styles.createPostButton}
+                onPress={onCreatePost}
+              >
+                <Text style={styles.createPostButtonText}>Create</Text>
+              </TouchableOpacity>
+            )}
+          </View>
+        )}
+      />
+      
+      {/* Video Player Modal */}
+      <VideoPlayerModal
+        visible={!!selectedVideo}
+        videoUri={selectedVideo}
+        onClose={() => setSelectedVideo(null)}
+      />
+      
+      {/* Image Preview Modal */}
+      <ImagePreviewModal
+        visible={!!selectedImages}
+        images={selectedImages || []}
+        currentIndex={selectedImageIndex}
+        onClose={() => {
+          setSelectedImages(null);
+          setSelectedImageIndex(0);
+        }}
+      />
+    </>
   );
 };
 
@@ -289,7 +414,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   const followerIds = new Set(
     followers.map(f => f._id?.toString()).filter(Boolean)
   );  
-  // For followers list: mutual if profile owner also follows them back
+ 
   const getIsMutualForFollower = (user) => {
     const userIdStr = user._id?.toString();
     return user.isMutual || (userIdStr && followingIds.has(userIdStr));
@@ -316,6 +441,8 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
   useEffect(() => {
     if (userId) {
       console.log(' Fetching user profile for:', userId);
+    
+      dispatch(clearUserPosts());
       dispatch(fetchUserProfile(userId));
     
       if (!isOwnProfile) {
@@ -649,40 +776,46 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
         onMessagePress={handleMessage}
       />
 
-      <View style={styles.tabContainer}>
-        <TouchableOpacity
-          style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
-          onPress={() => handleTabPress('posts')}
-        >
-          <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
-            Posts
-          </Text>
-        </TouchableOpacity>
-        {isOwnProfile && (
-          <>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'followers' && styles.activeTab]}
-              onPress={() => handleTabPress('followers')}
-            >
-              <Text style={[styles.tabText, activeTab === 'followers' && styles.activeTabText]}>
-                Followers
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              style={[styles.tab, activeTab === 'following' && styles.activeTab]}
-              onPress={() => handleTabPress('following')}
-            >
-              <Text style={[styles.tabText, activeTab === 'following' && styles.activeTabText]}>
-                Following
-              </Text>
-            </TouchableOpacity>
-          </>
-        )}
-      </View>
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentContainerStyle={styles.scrollContent}
+        showsVerticalScrollIndicator={false}
+      >
+        <View style={styles.tabContainer}>
+          <TouchableOpacity
+            style={[styles.tab, activeTab === 'posts' && styles.activeTab]}
+            onPress={() => handleTabPress('posts')}
+          >
+            <Text style={[styles.tabText, activeTab === 'posts' && styles.activeTabText]}>
+              Posts
+            </Text>
+          </TouchableOpacity>
+          {isOwnProfile && (
+            <>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'followers' && styles.activeTab]}
+                onPress={() => handleTabPress('followers')}
+              >
+                <Text style={[styles.tabText, activeTab === 'followers' && styles.activeTabText]}>
+                  Followers
+                </Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.tab, activeTab === 'following' && styles.activeTab]}
+                onPress={() => handleTabPress('following')}
+              >
+                <Text style={[styles.tabText, activeTab === 'following' && styles.activeTabText]}>
+                  Following
+                </Text>
+              </TouchableOpacity>
+            </>
+          )}
+        </View>
 
-      <View style={styles.contentContainer}>
-        {renderContent()}
-      </View>
+        <View style={styles.contentContainer}>
+          {renderContent()}
+        </View>
+      </ScrollView>
 
       {/* Profile Picture Preview Modal */}
       <Modal
@@ -844,8 +977,13 @@ const styles = StyleSheet.create({
     color: colors.text,
     fontWeight: '600',
   },
-  contentContainer: {
+  scrollContainer: {
     flex: 1,
+  },
+  scrollContent: {
+    flexGrow: 1,
+  },
+  contentContainer: {
     minHeight: 400,
   },
   userListItem: {
@@ -998,6 +1136,32 @@ const styles = StyleSheet.create({
   postGridImage: {
     width: '100%',
     height: '100%',
+    borderRadius: 4,
+  },
+  postGridVideoContainer: {
+    width: '100%',
+    height: '100%',
+    overflow: 'hidden',
+    borderRadius: 4,
+    backgroundColor: colors.bgAlt,
+  },
+  postGridVideoPlaceholder: {
+    width: '100%',
+    height: '100%',
+    backgroundColor: colors.bgAlt,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 4,
+  },
+  postGridVideoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
     borderRadius: 4,
   },
   multipleImagesIndicator: {

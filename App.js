@@ -40,7 +40,7 @@ import {
 
 
 import { useAppDispatch, useCurrentScreen, useAuthLoading, useAuthError, useAppSelector } from './src/hooks/hooks';
-import { setCurrentScreen, setSelectedUserId, setSelectedChatUser, setFollowSomeoneSource } from './src/store/slices/uiSlice';
+import { setCurrentScreen, setSelectedUserId, setSelectedChatUser, setFollowSomeoneSource, incrementNotificationCount, setUnreadNotificationCount } from './src/store/slices/uiSlice';
 import { loginUser, signupUser, updateUserCountry, loadStoredAuth, verifyOTP, verifyResetPasswordOTP, verifyToken, logoutUser, googleLogin } from './src/store/slices/authSlice';
 import { updateUserProfile } from './src/store/slices/userSlice';
 import { updateCommentCount } from './src/store/slices/postsSlice';
@@ -81,8 +81,20 @@ function AppContent() {
         dispatch(setCurrentScreen('home'));
         
 
-        socketService.connect().catch((error) => {
-          console.log('⚠️ Socket connection failed (non-critical):', error);
+        socketService.connect().then(() => {
+          socketService.on('new_notification', (notification) => {
+            console.log('📬 New notification received:', notification);
+            dispatch(incrementNotificationCount());
+          });
+          
+          socketService.on('notification_count', (data) => {
+            console.log('📊 Notification count update from server:', data);
+            if (typeof data.count === 'number') {
+              dispatch(setUnreadNotificationCount(data.count));
+            }
+          });
+        }).catch((error) => {
+          console.log(' Socket connection failed (non-critical):', error);
         });
         
    
@@ -776,6 +788,7 @@ function AppContent() {
       case 'login':
         return (
           <LoginScreen
+            isLoading={authLoading}
             onBack={handleBackToWelcome}
             onSubmit={handleLoginSubmit}
             onSocial={handleSocialLogin}
@@ -790,6 +803,7 @@ function AppContent() {
             onSubmit={handleSignupSubmit}
             onSocial={handleSocialLogin}
             onGoToSignIn={handleSignInPassword}
+            isLoading={authLoading}
           />
         );
       case 'forgotPassword':

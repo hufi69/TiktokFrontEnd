@@ -16,16 +16,16 @@ import BackButton from '../components/common/BackButton';
 import { colors, spacing } from '../constants/theme';
 import { CONFIG } from '../config';
 import { getNotifications, updateNotification } from '../services/api/notificationApi';
-import { useAppSelector } from '../hooks/hooks';
-
-
-const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
+import { useAppSelector, useAppDispatch } from '../hooks/hooks';
+import socketService from '../services/socket/socketService';
+import { setUnreadNotificationCount, decrementNotificationCount } from '../store/slices/uiSlice';
+import { DEFAULT_AVATAR } from '../constants/theme';
 const getAvatarUrl = (profilePicture) => {
   if (!profilePicture) return DEFAULT_AVATAR;
   if (/^https?:\/\//.test(profilePicture)) {
     return profilePicture;
   }
-  return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
+  return `${CONFIG.API_BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 
@@ -79,6 +79,7 @@ const getDateGroup = (dateString) => {
 };
 
 const ActivityScreen = ({ onBack, onUserPress, onFollowPress }) => {
+  const dispatch = useAppDispatch();
   const currentUser = useAppSelector((state) => state.auth.user);
   const [notifications, setNotifications] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
@@ -87,6 +88,35 @@ const ActivityScreen = ({ onBack, onUserPress, onFollowPress }) => {
 
   useEffect(() => {
     fetchNotifications();
+    
+    // Set up socket listener for real-time notifications
+    const handleNewNotification = (notification) => {
+      console.log('📬 New notification in ActivityScreen:', notification);
+      const sender = notification.sender || {};
+      const transformedNotification = {
+        id: notification._id || notification.id,
+        type: notification.type,
+        title: notification.title,
+        message: notification.message,
+        read: notification.read || false,
+        timestamp: formatTimestamp(notification.createdAt || new Date().toISOString()),
+        dateGroup: getDateGroup(notification.createdAt || new Date().toISOString()),
+        createdAt: notification.createdAt || new Date().toISOString(),
+        user: {
+          _id: sender._id,
+          userName: sender.userName,
+          fullName: sender.userName,
+          profilePicture: sender.profilePicture || null,
+        },
+      };
+      setNotifications(prev => [transformedNotification, ...prev]);
+    };
+    
+    socketService.on('new_notification', handleNewNotification);
+    
+    return () => {
+      socketService.off('new_notification', handleNewNotification);
+    };
   }, []);
 
   const fetchNotifications = async () => {
@@ -117,6 +147,10 @@ const ActivityScreen = ({ onBack, onUserPress, onFollowPress }) => {
       });
 
       setNotifications(transformedNotifications);
+      
+      // Update unread count in Redux
+      const unreadCount = transformedNotifications.filter(n => !n.read).length;
+      dispatch(setUnreadNotificationCount(unreadCount));
     } catch (error) {
       console.error('Error fetching notifications:', error);
       setNotifications([]);
@@ -140,6 +174,8 @@ const ActivityScreen = ({ onBack, onUserPress, onFollowPress }) => {
         setNotifications(prev =>
           prev.map(n => n.id === notification.id ? { ...n, read: true } : n)
         );
+        // Decrement unread count
+        dispatch(decrementNotificationCount());
       } catch (error) {
         console.error('Error updating notification:', error);
         Alert.alert('Error', 'Failed to mark notification as read. Please try again.');

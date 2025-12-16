@@ -403,6 +403,10 @@ const userSlice = createSlice({
       state.followers = [];
       state.following = [];
     },
+    clearUserPosts: (state) => {
+      state.userPosts = [];
+      state.postsCount = 0;
+    },
     setProfileUpdated: (state, action) => {
       state.isProfileUpdated = action.payload;
     },
@@ -413,6 +417,8 @@ const userSlice = createSlice({
       .addCase(fetchUserProfile.pending, (state) => {
         state.isLoading = true;
         state.error = null;
+        state.userPosts = [];
+        state.postsCount = 0;
       })
       .addCase(fetchUserProfile.fulfilled, (state, action) => {
         state.isLoading = false;
@@ -630,6 +636,7 @@ export const {
   setViewedUser,
   updateCurrentUser,
   clearViewedUser,
+  clearUserPosts,
   setProfileUpdated,
 } = userSlice.actions;
 

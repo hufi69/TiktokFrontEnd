@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, ActivityIndicator } from 'react-native';
 import { KeyboardAwareScrollView } from 'react-native-keyboard-aware-scroll-view';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
@@ -8,7 +8,7 @@ import AuthInput from '../AuthScreen/components/AuthInput';
 import SocialButton from '../AuthScreen/components/SocialButton';
 import { colors } from '../../constants/theme';
 
-const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn }) => {
+const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn, isLoading = false }) => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [remember, setRemember] = useState(false);
@@ -89,17 +89,21 @@ const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn }) => {
             <TouchableOpacity 
               style={[
                 styles.primaryButton, 
-                !isFormValid && styles.primaryButtonDisabled
+                (!isFormValid || isLoading) && styles.primaryButtonDisabled
               ]} 
               onPress={() => isFormValid && onSubmit && onSubmit({ email: email.trim(), password, remember })}
-              disabled={!isFormValid}
+              disabled={!isFormValid || isLoading}
             >
-              <Text style={[
-                styles.primaryText,
-                !isFormValid && styles.primaryTextDisabled
-              ]}>
-                Sign up
-              </Text>
+              {isLoading ? (
+                <ActivityIndicator size="small" color={colors.bg} />
+              ) : (
+                <Text style={[
+                  styles.primaryText,
+                  !isFormValid && styles.primaryTextDisabled
+                ]}>
+                  Sign up
+                </Text>
+              )}
             </TouchableOpacity>
           </View>
 

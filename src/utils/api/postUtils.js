@@ -14,7 +14,7 @@ export const transformPost = (raw, userId) => {
   const avatar = (() => {
     const pp = raw?.author?.profilePicture;
     if (!pp) return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
-    return /^https?:\/\//.test(pp) ? pp : `${API_CONFIG.BASE_URL}/public/img/users/${pp}`;
+    return /^https?:\/\//.test(pp) ? pp : `${API_CONFIG.BASE_URL}/public/uploads/users/${pp}`;
   })();
 
   const images = (raw.media || [])
@@ -64,7 +64,7 @@ export const buildStories = (basePosts, user) => {
   const yourAvatar = (() => {
     const pp = user?.profilePicture;
     if (!pp) return 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
-    return /^https?:\/\//.test(pp) ? pp : `${API_CONFIG.BASE_URL}/public/img/users/${pp}`;
+    return /^https?:\/\//.test(pp) ? pp : `${API_CONFIG.BASE_URL}/public/uploads/users/${pp}`;
   })();
 
   const yourStory = {

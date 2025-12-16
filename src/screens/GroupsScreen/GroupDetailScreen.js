@@ -63,7 +63,7 @@ const GroupDetailScreen = ({
     return memberUserId && currentUserId && memberUserId.toString() === currentUserId.toString();
   });
   const effectiveUserRole = currentUserMember?.role || userRole || 'member';
-  const effectiveIsMember = isMember || (currentUserMember?.status === 'active');
+  const effectiveIsMember = (currentUserMember?.status === 'active') || isMember;
   const isAdmin = effectiveUserRole === 'admin';
 
   useEffect(() => {
@@ -75,6 +75,15 @@ const GroupDetailScreen = ({
       }
     }
   }, [groupId, dispatch, effectiveIsMember]);
+
+  // Update isMember state when members are fetched
+  useEffect(() => {
+    if (currentUserMember?.status === 'active') {
+      setIsMember(true);
+    } else if (members.length > 0 && !currentUserMember) {
+      setIsMember(false);
+    }
+  }, [currentUserMember, members.length]);
 // for the debug 
   useEffect(() => {
     if (groupId) {
@@ -110,15 +119,36 @@ const GroupDetailScreen = ({
     if (!groupId) return;
     setJoining(true);
     try {
-      await dispatch(joinGroup(groupId)).unwrap();
-      setIsMember(true);
-      await dispatch(fetchGroupPosts({ groupId }));
+      const response = await dispatch(joinGroup(groupId)).unwrap();
+      const isPrivate = group?.privacy === 'private';
+      
+      if (isPrivate) {
+        // Private group: Join request created
+        Alert.alert(
+          'Request Sent', 
+          'Your join request has been sent to the group admin. You will be notified once approved.'
+        );
+        await dispatch(fetchGroupMembers({ groupId }));
+      } else {
+        // Public group: Immediate join
+        setIsMember(true);
+        await dispatch(fetchGroupMembers({ groupId }));
+        await dispatch(fetchGroupPosts({ groupId }));
+        Alert.alert('Success', 'Successfully joined the group!');
+      }
     } catch (error) {
-      console.error('Join group error:', error);
+      if (error && error.toLowerCase().includes('already a member')) {
+        setIsMember(true);
+        await dispatch(fetchGroupMembers({ groupId }));
+        await dispatch(fetchGroupPosts({ groupId }));
+        Alert.alert('Info', 'You are already a member of this group');
+      } else {
+        Alert.alert('Error', error || 'Failed to join group');
+      }
     } finally {
       setJoining(false);
     }
-  }, [groupId, dispatch]);
+  }, [groupId, group?.privacy, dispatch]);
 
   const handleDeleteGroup = useCallback(() => {
     if (!groupId) return;
@@ -222,22 +252,7 @@ const GroupDetailScreen = ({
         </View>
 
         {/* Action Buttons */}
-        {!effectiveIsMember ? (
-          <TouchableOpacity 
-            style={[styles.joinButton, joining && styles.joinButtonDisabled]}
-            onPress={handleJoin}
-            disabled={joining}
-          >
-            {joining ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Icon name="user-plus" size={18} color="#fff" />
-                <Text style={styles.joinButtonText}>Join Group</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        ) : (
+        {effectiveIsMember ? (
           <View style={styles.actionButtons}>
             <TouchableOpacity 
               style={styles.actionButton}
@@ -247,22 +262,51 @@ const GroupDetailScreen = ({
               <Text style={styles.actionButtonText}>Create Post</Text>
             </TouchableOpacity>
           </View>
-        )}
+        ) : null}
+        {/* Join button is shown in restricted view for private groups, not here */}
       </View>
     </View>
   );
 
-  if (!effectiveIsMember) {
+  // Show restricted view for non-members of private groups
+  if (!effectiveIsMember && group?.privacy === 'private') {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Icon name="chevron-left" size={22} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.headerTitle}>Group</Text>
+          <Text style={styles.headerTitle} numberOfLines={1}>
+            {group?.name || 'Group'}
+          </Text>
           <View style={{ width: 30 }} />
         </View>
+        
+        {/* Group Header Info */}
         {renderHeader()}
+        
+        {/* Restricted Access Message */}
+        <View style={styles.restrictedContainer}>
+          <Icon name="lock" size={64} color={colors.textLight} />
+          <Text style={styles.restrictedTitle}>Private Group</Text>
+          <Text style={styles.restrictedMessage}>
+            Can't access the group. Please join the group to get the access.
+          </Text>
+          <TouchableOpacity 
+            style={[styles.restrictedJoinButton, joining && styles.joinButtonDisabled]}
+            onPress={handleJoin}
+            disabled={joining}
+          >
+            {joining ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
+                <Icon name="user-plus" size={18} color="#fff" />
+                <Text style={styles.restrictedJoinButtonText}>Join Group</Text>
+              </>
+            )}
+          </TouchableOpacity>
+        </View>
       </SafeAreaView>
     );
   }
@@ -548,6 +592,42 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: colors.textLight,
     marginTop: spacing.xs,
+  },
+  restrictedContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: spacing.xl,
+  },
+  restrictedTitle: {
+    fontSize: 24,
+    fontWeight: '700',
+    color: colors.text,
+    marginTop: spacing.l,
+    marginBottom: spacing.m,
+  },
+  restrictedMessage: {
+    fontSize: 16,
+    color: colors.textLight,
+    textAlign: 'center',
+    marginBottom: spacing.xl,
+    lineHeight: 24,
+  },
+  restrictedJoinButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    backgroundColor: colors.pink,
+    paddingHorizontal: spacing.xl,
+    paddingVertical: spacing.m,
+    borderRadius: radius.m,
+    gap: spacing.s,
+    minWidth: 200,
+  },
+  restrictedJoinButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
   },
   menuButton: {
     padding: spacing.xs,

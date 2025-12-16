@@ -28,7 +28,7 @@ const getAvatarUrl = (profilePicture) => {
     return profilePicture;
   }
   // Otherwise, construct the full URL with base URL
-  return `${CONFIG.API_BASE_URL}/public/img/users/${profilePicture}`;
+  return `${CONFIG.API_BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 const UserItem = ({ user, onToggleFollow, loading, onUserPress }) => {
