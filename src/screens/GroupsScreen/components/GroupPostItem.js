@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useEffect } from 'react';
+import React, { useState, useCallback, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -24,12 +24,13 @@ const getAvatarUrl = (profilePicture) => {
   return `${baseUrl}/public/img/users/${profilePicture}`;
 };
 
-const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUserId, onPostUpdated }) => {
+const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUserId, onPostUpdated, onEdit }) => {
   const dispatch = useAppDispatch();
   const postId = post?._id || post?.id;
   const [liked, setLiked] = useState(post?.likedByMe || false);
   const [likeCount, setLikeCount] = useState(post?.likes || 0);
   const [liking, setLiking] = useState(false);
+  const isUpdatingLikeRef = useRef(false); 
   
   const isAuthor = post?.author?._id === currentUserId || post?.author?.id === currentUserId;
   const isAdmin = userRole === 'admin';
@@ -39,21 +40,22 @@ const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUse
   const isPending = postStatus === 'pending';
   const isPinned = post?.isPinned;
 
-  // Initialize like state from post
+  // Initialize like state from post 
+  const postIdKey = post?._id || post?.id;
   useEffect(() => {
-    if (post) {
+    if (post && !isUpdatingLikeRef.current) {
       setLiked(post.likedByMe || false);
       setLikeCount(post.likes || 0);
     }
-  }, [post]);
+  }, [postIdKey]); 
 
   const handleLike = useCallback(async () => {
     if (!groupId || !postId || liking || postStatus !== 'published') return;
     
     setLiking(true);
+    isUpdatingLikeRef.current = true;
     const wasLiked = liked;
-    
-    // Optimistic update
+    const previousLikeCount = likeCount;
     setLiked(!wasLiked);
     setLikeCount(prev => wasLiked ? Math.max(0, prev - 1) : prev + 1);
     
@@ -63,19 +65,18 @@ const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUse
       } else {
         await dispatch(likeGroupPost({ groupId, postId })).unwrap();
       }
-      // Refresh post to get updated like count
-      if (onPostUpdated) {
-        onPostUpdated();
-      }
     } catch (error) {
-      // Revert optimistic update on error
       setLiked(wasLiked);
-      setLikeCount(prev => wasLiked ? prev + 1 : Math.max(0, prev - 1));
+      setLikeCount(previousLikeCount);
+      Alert.alert('Error', error || 'Failed to like post');
       console.error('Like error:', error);
     } finally {
       setLiking(false);
+      setTimeout(() => {
+        isUpdatingLikeRef.current = false;
+      }, 500);
     }
-  }, [groupId, postId, liked, liking, postStatus, dispatch, onPostUpdated]);
+  }, [groupId, postId, liked, likeCount, liking, postStatus, dispatch]);
 
   const handlePin = useCallback(async () => {
     if (!groupId) return;
@@ -167,6 +168,11 @@ const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUse
       options.push({ text: isPinned ? 'Unpin' : 'Pin', onPress: handlePin });
     }
     
+    // Edit option for author or admin
+    if (isAuthor || isAdmin || canModerate) {
+      options.push({ text: 'Edit', onPress: () => onEdit?.(post) });
+    }
+    
     if (isAuthor || canModerate) {
       options.push({ text: 'Delete', style: 'destructive', onPress: handleDelete });
     }
@@ -174,7 +180,7 @@ const GroupPostItem = ({ post, groupId, onPress, onComment, userRole, currentUse
     if (options.length > 0) {
       Alert.alert('Post Options', '', options.concat([{ text: 'Cancel', style: 'cancel' }]));
     }
-  }, [canModerate, isPending, isPinned, isAuthor, handleApprove, handleReject, handlePin, handleDelete]);
+  }, [canModerate, isPending, isPinned, isAuthor, isAdmin, handleApprove, handleReject, handlePin, handleDelete, onEdit, post]);
 
   const images = post?.media?.filter(m => m.type === 'image').map(m => {
     const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');

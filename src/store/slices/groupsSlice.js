@@ -121,6 +121,19 @@ export const fetchGroupPosts = createAsyncThunk(
   }
 );
 
+// Fetch single group post
+export const fetchGroupPost = createAsyncThunk(
+  'groups/fetchGroupPost',
+  async ({ groupId, postId }, { rejectWithValue }) => {
+    try {
+      const response = await groupsApi.getGroupPost(groupId, postId);
+      return { groupId, postId, post: response.data || response };
+    } catch (error) {
+      return rejectWithValue(error.message || 'Failed to fetch group post');
+    }
+  }
+);
+
 // Create group post
 export const createGroupPost = createAsyncThunk(
   'groups/createGroupPost',
@@ -591,15 +604,12 @@ const groupsSlice = createSlice({
       .addCase(deleteGroup.fulfilled, (state, action) => {
         state.isLoading = false;
         const groupId = action.payload;
-        // Remove from userGroups
         state.userGroups = state.userGroups.filter(g => (g._id || g.id) !== groupId);
-        // Remove from groups
         state.groups = state.groups.filter(g => (g._id || g.id) !== groupId);
-        // Clear currentGroup if it's the deleted one
         if (state.currentGroup && (state.currentGroup._id === groupId || state.currentGroup.id === groupId)) {
           state.currentGroup = null;
         }
-        // Clean up related data
+        alert('Group deleted successfully'); 
         delete state.groupPosts[groupId];
         delete state.groupMembers[groupId];
         delete state.joinRequests[groupId];
@@ -627,8 +637,40 @@ const groupsSlice = createSlice({
     // Fetch Group Posts
     builder
       .addCase(fetchGroupPosts.fulfilled, (state, action) => {
-        const { groupId, posts } = action.payload;    
-        state.groupPosts[groupId] = posts;
+        const { groupId, posts } = action.payload;
+        // Sort posts: 
+        const sortedPosts = [...(posts || [])].sort((a, b) => {
+          // Pinned posts first
+          if (a.isPinned && !b.isPinned) return -1;
+          if (!a.isPinned && b.isPinned) return 1;
+          // sorted by dates 
+          const dateA = new Date(a.createdAt || a.created_at || 0);
+          const dateB = new Date(b.createdAt || b.created_at || 0);
+          return dateB - dateA;
+        });
+        state.groupPosts[groupId] = sortedPosts; 
+      })
+      .addCase(fetchGroupPost.pending, (state) => {
+        state.isLoading = true;
+      })
+      .addCase(fetchGroupPost.fulfilled, (state, action) => {
+        state.isLoading = false;
+        const { groupId, postId, post } = action.payload;
+        if (state.groupPosts[groupId]) {
+          const index = state.groupPosts[groupId].findIndex(
+            p => (p._id || p.id) === postId
+          );
+          if (index !== -1) {
+            state.groupPosts[groupId][index] = post;
+          } else {
+            state.groupPosts[groupId].push(post);
+          }
+        } else {
+          state.groupPosts[groupId] = [post];
+        }
+      })
+      .addCase(fetchGroupPost.rejected, (state) => {
+        state.isLoading = false;
       });
 
     // Create Group Post

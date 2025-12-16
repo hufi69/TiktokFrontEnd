@@ -30,6 +30,7 @@ import {
   GroupDetailScreen, 
   CreateGroupScreen,
   CreateGroupPostScreen,
+  EditGroupPostScreen,
   GroupMembersScreen,
   JoinRequestsScreen,
   InviteLinksScreen,
@@ -986,6 +987,24 @@ function AppContent() {
             }}
           />
         );
+      case 'editGroupPost':
+        return (
+          <EditGroupPostScreen
+            group={selectedGroup}
+            post={selectedGroup?._editingPost}
+            onBack={() => {
+              const { _editingPost, ...groupWithoutPost } = selectedGroup || {};
+              setSelectedGroup(groupWithoutPost);
+              dispatch(setCurrentScreen('groupDetail'));
+            }}
+            onPostUpdated={() => {
+              const { _editingPost, ...groupWithoutPost } = selectedGroup || {};
+              setSelectedGroup(groupWithoutPost);
+              dispatch(setCurrentScreen('groupDetail'));
+            }}
+            userRole={selectedGroup?.userRole || 'member'}
+          />
+        );
       case 'groupDetail':
         return (
           <GroupDetailScreen
@@ -1004,6 +1023,10 @@ function AppContent() {
             onCommentPress={({ groupId, postId, post }) => {
               setSelectedGroup({ ...selectedGroup, _groupId: groupId, _postId: postId, _post: post });
               dispatch(setCurrentScreen('groupComments'));
+            }}
+            onEditPost={(post) => {
+              setSelectedGroup({ ...selectedGroup, _editingPost: post });
+              dispatch(setCurrentScreen('editGroupPost'));
             }}
             onMembersPress={() => {
               dispatch(setCurrentScreen('groupMembers'));

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -17,16 +17,77 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { launchImageLibrary, launchCamera } from 'react-native-image-picker';
 import { useAppDispatch } from '../../hooks/hooks';
-import { createGroupPost } from '../../store/slices/groupsSlice';
+import { updateGroupPost } from '../../store/slices/groupsSlice';
 import { colors, spacing, radius } from '../../constants/theme';
+import { CONFIG } from '../../config';
 
-const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
+const getMediaUrl = (mediaItem) => {
+  if (!mediaItem) return null;
+  if (typeof mediaItem === 'string') {
+    // If it's already a URL string
+    if (mediaItem.startsWith('http')) return mediaItem;
+    const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
+    return `${baseUrl}${mediaItem}`;
+  }
+  // If it's an object with url property
+  if (mediaItem.url) {
+    if (mediaItem.url.startsWith('http')) return mediaItem.url;
+    const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
+    return `${baseUrl}${mediaItem.url}`;
+  }
+  return null;
+};
+
+const EditGroupPostScreen = ({ group, post, onBack, onPostUpdated, userRole }) => {
   const dispatch = useAppDispatch();
   const groupId = group?._id || group?.id;
-  const [content, setContent] = useState('');
+  const postId = post?._id || post?.id;
+  const isAdmin = userRole === 'admin';
+  
+  const [content, setContent] = useState(post?.content || '');
   const [media, setMedia] = useState([]);
+  const [tags, setTags] = useState(post?.tags?.join(', ') || '');
+  const [status, setStatus] = useState(post?.status || 'published');
+  const [isPinned, setIsPinned] = useState(post?.isPinned || false);
   const [isLoading, setIsLoading] = useState(false);
 
+  useEffect(() => {
+    if (post?.media && Array.isArray(post.media)) {
+      const existingMedia = post.media.map((item) => {
+        let originalUrl = null;
+        if (typeof item === 'string') {
+          originalUrl = item;
+        } else if (item.url) {
+          originalUrl = item.url; 
+        }
+        const displayUrl = getMediaUrl(item); 
+        
+        return {
+          uri: displayUrl,
+          type: item.type === 'video' ? 'video/mp4' : 'image/jpeg',
+          fileName: item.filename || (item.type === 'video' ? 'video.mp4' : 'image.jpg'),
+          name: item.filename || (item.type === 'video' ? 'video.mp4' : 'image.jpg'),
+          isVideo: item.type === 'video',
+          isExisting: true, 
+          existingUrl: originalUrl, 
+        };
+      });
+      setMedia(existingMedia);
+    }
+    if (post?.content) {
+      setContent(post.content);
+    }
+    if (post?.tags) {
+      setTags(post.tags.join(', '));
+    }
+    if (post?.status) {
+      setStatus(post.status);
+    }
+    if (post?.isPinned !== undefined) {
+      setIsPinned(post.isPinned);
+    }
+  }, [post]);
+  console.log('media', media);
   const isVideoAsset = (asset) => {
     if (!asset) return false;
     if (asset.type?.startsWith('video/')) return true;
@@ -45,6 +106,7 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
       fileName,
       name: fileName,
       isVideo,
+      isExisting: false,
     };
   };
 
@@ -169,33 +231,72 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
   };
 
   const handleSubmit = async () => {
-    if (!content.trim() && media.length === 0) {
-      Alert.alert('Error', 'Post must contain either text content or media');
+    if (!content.trim()) {
+      Alert.alert('Error', 'Post content is required');
       return;
     }
 
-    if (!groupId) {
-      Alert.alert('Error', 'Group not found');
+    if (!groupId || !postId) {
+      Alert.alert('Error', 'Group or post not found');
       return;
     }
 
     setIsLoading(true);
     try {
+      // Parse tags
+      const tagsArray = tags
+        .split(',')
+        .map(t => t.trim())
+        .filter(t => t.length > 0);
+      const existingMediaUrls = media
+        .filter(m => m.isExisting && m.existingUrl)
+        .map(m => {
+          const url = m.existingUrl;
+          if (url.startsWith('http')) return url;
+          const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
+          return `${baseUrl}${url}`;
+        });
+
       const postData = {
         content: content.trim(),
-        media: media, 
-        tags: [],
-        mentions: [],
+        tags: tagsArray,
       };
 
-      await dispatch(createGroupPost({ groupId, postData })).unwrap();
-      Alert.alert('Success', 'Post created successfully!');
-      if (onPostCreated) {
-        onPostCreated();
+      // Include existing media URLs 
+      if (existingMediaUrls.length > 0) {
+        postData.media = existingMediaUrls;
+      } else if (post?.media && post.media.length > 0) {
+        postData.media = post.media.map(m => {
+          let url = null;
+          if (typeof m === 'string') {
+            url = m;
+          } else if (m.url) {
+            url = m.url;
+          }
+          if (url) {
+            if (url.startsWith('http')) return url;
+            const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
+            return `${baseUrl}${url}`;
+          }
+          return null;
+        }).filter(Boolean);
+      } else {
+        postData.media = [];
+      }
+
+      if (isAdmin) {
+        postData.status = status;
+        postData.isPinned = isPinned;
+      }
+
+      await dispatch(updateGroupPost({ groupId, postId, postData })).unwrap();
+      Alert.alert('Success', 'Post updated successfully!');
+      if (onPostUpdated) {
+        onPostUpdated();
       }
       onBack();
     } catch (error) {
-      Alert.alert('Error', error || 'Failed to create post');
+      Alert.alert('Error', error || 'Failed to update post');
     } finally {
       setIsLoading(false);
     }
@@ -212,7 +313,7 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
           <TouchableOpacity onPress={onBack} style={styles.backButton}>
             <Icon name="times" size={24} color={colors.text} />
           </TouchableOpacity>
-          <Text style={styles.title}>Create Post</Text>
+          <Text style={styles.title}>Edit Post</Text>
           <TouchableOpacity
             style={[styles.postButton, (!content.trim() && media.length === 0) && styles.postButtonDisabled]}
             onPress={handleSubmit}
@@ -222,7 +323,7 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Text style={[styles.postButtonText, (!content.trim() && media.length === 0) && styles.postButtonTextDisabled]}>
-                Post
+                Save
               </Text>
             )}
           </TouchableOpacity>
@@ -246,9 +347,58 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
             textAlignVertical="top"
           />
 
-          {/* Media Preview */}
+          {/* Tags Input */}
+          <View style={styles.section}>
+            <Text style={styles.sectionTitle}>Tags (comma-separated)</Text>
+            <TextInput
+              style={styles.tagsInput}
+              placeholder="e.g., announcement, update"
+              placeholderTextColor={colors.textLight}
+              value={tags}
+              onChangeText={setTags}
+            />
+          </View>
+
+          {/* Admin-only fields */}
+          {isAdmin && (
+            <>
+              {/* Status */}
+              <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Status</Text>
+                <View style={styles.statusOptions}>
+                  {['published', 'pending', 'deleted'].map((s) => (
+                    <TouchableOpacity
+                      key={s}
+                      style={[styles.statusOption, status === s && styles.statusOptionActive]}
+                      onPress={() => setStatus(s)}
+                    >
+                      <Text style={[styles.statusOptionText, status === s && styles.statusOptionTextActive]}>
+                        {s.charAt(0).toUpperCase() + s.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  ))}
+                </View>
+              </View>
+
+              {/* Pin Post */}
+              <View style={styles.section}>
+                <View style={styles.switchRow}>
+                  <Text style={styles.switchLabel}>Pin Post</Text>
+                  <TouchableOpacity
+                    style={[styles.switch, isPinned && styles.switchActive]}
+                    onPress={() => setIsPinned(!isPinned)}
+                  >
+                    <View style={[styles.switchThumb, isPinned && styles.switchThumbActive]} />
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </>
+          )}
+
+          {/* Media Preview - Read Only */}
           {media.length > 0 && (
             <View style={styles.mediaContainer}>
+              <Text style={styles.mediaSectionTitle}>Media (Cannot be edited)</Text>
               {media.map((item, index) => (
                 <View key={index} style={styles.mediaItem}>
                   {item.isVideo ? (
@@ -257,30 +407,12 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
                       <Text style={styles.videoText}>Video</Text>
                     </View>
                   ) : (
-                    <Image source={{ uri: item.uri }} style={styles.mediaImage} />
+                    <Image source={{ uri: item.uri || item.existingUrl }} style={styles.mediaImage} />
                   )}
-                  <TouchableOpacity
-                    style={styles.removeButton}
-                    onPress={() => removeMedia(index)}
-                  >
-                    <Icon name="times-circle" size={24} color="#fff" />
-                  </TouchableOpacity>
                 </View>
               ))}
             </View>
           )}
-
-          {/* Media Actions */}
-          <View style={styles.mediaActions}>
-            <TouchableOpacity style={styles.mediaButton} onPress={pickFromGallery}>
-              <Icon name="photo" size={20} color={colors.pink} />
-              <Text style={styles.mediaButtonText}>Photos/Videos</Text>
-            </TouchableOpacity>
-            <TouchableOpacity style={styles.mediaButton} onPress={captureFromCamera}>
-              <Icon name="camera" size={20} color={colors.pink} />
-              <Text style={styles.mediaButtonText}>Camera</Text>
-            </TouchableOpacity>
-          </View>
         </ScrollView>
       </KeyboardAvoidingView>
     </SafeAreaView>
@@ -346,11 +478,90 @@ const styles = StyleSheet.create({
     minHeight: 150,
     marginBottom: spacing.m,
   },
-  mediaContainer: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    gap: spacing.s,
+  section: {
     marginBottom: spacing.m,
+  },
+  sectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.text,
+    marginBottom: spacing.s,
+  },
+  tagsInput: {
+    fontSize: 16,
+    color: colors.text,
+    padding: spacing.m,
+    backgroundColor: colors.surface,
+    borderRadius: radius.m,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statusOptions: {
+    flexDirection: 'row',
+    gap: spacing.s,
+  },
+  statusOption: {
+    paddingHorizontal: spacing.m,
+    paddingVertical: spacing.s,
+    borderRadius: radius.m,
+    backgroundColor: colors.surface,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  statusOptionActive: {
+    backgroundColor: colors.pink,
+    borderColor: colors.pink,
+  },
+  statusOptionText: {
+    fontSize: 14,
+    color: colors.text,
+    fontWeight: '600',
+  },
+  statusOptionTextActive: {
+    color: '#fff',
+  },
+  switchRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    padding: spacing.m,
+    backgroundColor: colors.surface,
+    borderRadius: radius.m,
+  },
+  switchLabel: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text,
+  },
+  switch: {
+    width: 50,
+    height: 30,
+    borderRadius: 15,
+    backgroundColor: colors.border,
+    justifyContent: 'center',
+    paddingHorizontal: 2,
+  },
+  switchActive: {
+    backgroundColor: colors.pink,
+  },
+  switchThumb: {
+    width: 26,
+    height: 26,
+    borderRadius: 13,
+    backgroundColor: '#fff',
+    alignSelf: 'flex-start',
+  },
+  switchThumbActive: {
+    alignSelf: 'flex-end',
+  },
+  mediaContainer: {
+    marginBottom: spacing.m,
+  },
+  mediaSectionTitle: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: colors.textLight,
+    marginBottom: spacing.s,
   },
   mediaItem: {
     width: '48%',
@@ -382,6 +593,20 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.6)',
     borderRadius: 12,
   },
+  existingBadge: {
+    position: 'absolute',
+    bottom: spacing.xs,
+    left: spacing.xs,
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.xs,
+    paddingVertical: 2,
+    borderRadius: radius.s,
+  },
+  existingBadgeText: {
+    fontSize: 10,
+    color: '#fff',
+    fontWeight: '600',
+  },
   mediaActions: {
     flexDirection: 'row',
     gap: spacing.m,
@@ -403,4 +628,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default CreateGroupPostScreen;
+export default EditGroupPostScreen;

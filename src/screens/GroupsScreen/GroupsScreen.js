@@ -26,7 +26,7 @@ const GroupsScreen = ({ onBack, onCreateGroup, onGroupPress }) => {
   const [isSearching, setIsSearching] = useState(false);
   const [searchResults, setSearchResults] = useState([]);
   const [joiningGroupId, setJoiningGroupId] = useState(null);
-  const [joinedGroups, setJoinedGroups] = useState(new Set()); // Track joined groups
+  const [joinedGroups, setJoinedGroups] = useState(new Set()); 
 
   useEffect(() => {
     if (searchQuery.trim()) {

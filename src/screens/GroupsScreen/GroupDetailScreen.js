@@ -40,6 +40,7 @@ const GroupDetailScreen = ({
   onInviteLinksPress,
   onCommentPress,
   onGroupDeleted,
+  onEditPost,
   userRole,
   currentUserId 
 }) => {
@@ -154,6 +155,12 @@ const GroupDetailScreen = ({
     }
   }, [groupId, dispatch]);
 
+  const handleEditPost = useCallback((post) => {
+    if (onEditPost) {
+      onEditPost(post);
+    }
+  }, [onEditPost]);
+
   const renderPost = useCallback(({ item }) => (
     <GroupPostItem
       post={item}
@@ -163,8 +170,9 @@ const GroupDetailScreen = ({
       userRole={effectiveUserRole}
       currentUserId={currentUserId}
       onPostUpdated={handlePostUpdated}
+      onEdit={handleEditPost}
     />
-  ), [groupId, onPostPress, onCommentPress, effectiveUserRole, currentUserId, handlePostUpdated]);
+  ), [groupId, onPostPress, onCommentPress, effectiveUserRole, currentUserId, handlePostUpdated, handleEditPost]);
 
   const renderHeader = () => (
     <View>

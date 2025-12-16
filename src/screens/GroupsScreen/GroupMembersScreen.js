@@ -85,7 +85,7 @@ const GroupMembersScreen = ({
 
       await dispatch(updateMemberRole({ groupId, userId, updates })).unwrap();
       Alert.alert('Success', 'Member updated successfully');
-      
+      alert('Member updated successfully');
       // Refresh members list
       await dispatch(fetchGroupMembers({ groupId }));
       

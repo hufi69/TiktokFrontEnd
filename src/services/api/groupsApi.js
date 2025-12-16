@@ -31,6 +31,7 @@ export async function getUserGroups() {
   }
 }
 
+
 // Get single group
 export async function getGroup(groupId) {
   try {
@@ -140,43 +141,47 @@ export async function getGroupPosts(groupId, params = {}) {
 export async function getPendingGroupPosts(groupId, params = {}) {
   try {
     // TODO: Backend needs to add endpoint or query param to fetch pending posts
-    // For now, return empty array
+   
     return { status: 'success', data: [] };
   } catch (err) {
     throw err;
   }
 }
-
-// Create group post
 export async function createGroupPost(groupId, postData) {
   try {
-    const formData = new FormData();
-    const payload = {
-      content: postData.content || '',
-      tags: postData.tags || [],
-      mentions: postData.mentions || [],
-    };
-    
-    formData.append('data', JSON.stringify(payload));
-
-    if (Array.isArray(postData.images)) {
-      postData.images.forEach((image, idx) => {
-        if (image?.uri) {
-          const type = image.type || 'image/jpeg';
+    if (postData.media && Array.isArray(postData.media) && postData.media.length > 0 && postData.media[0]?.uri) {
+      const formData = new FormData();
+      const payload = {
+        content: postData.content || '',
+        tags: postData.tags || [],
+        mentions: postData.mentions || [],
+      };
+      formData.append('data', JSON.stringify(payload));
+      postData.media.forEach((mediaItem, idx) => {
+        if (mediaItem?.uri) {
+          const type = mediaItem.type || 'image/jpeg';
           const isVideo = typeof type === 'string' && type.startsWith('video/');
           const fallbackName = isVideo ? `video_${idx}.mp4` : `image_${idx}.jpg`;
-
           formData.append('images', {
-            uri: image.uri,
+            uri: mediaItem.uri,
             type,
-            name: image.fileName || image.name || image.filename || fallbackName,
+            name: mediaItem.fileName || mediaItem.name || mediaItem.filename || fallbackName,
           });
         }
       });
-    }
 
-    const result = await postFormDataRequest(`${MODEL_NAME}/${groupId}/posts`, formData);
-    return result;
+      const result = await postFormDataRequest(`${MODEL_NAME}/${groupId}/posts`, formData);
+      return result;
+    } else {
+      const payload = {
+        content: postData.content || '',
+        media: postData.media || [], 
+        tags: postData.tags || [],
+        mentions: postData.mentions || [],
+      };
+      const result = await postRequest(`${MODEL_NAME}/${groupId}/posts`, payload);
+      return result;
+    }
   } catch (err) {
     throw err;
   }
@@ -265,10 +270,25 @@ export async function removeMember(groupId, userId) {
   }
 }
 
-// Update group post
+
 export async function updateGroupPost(groupId, postId, postData) {
   try {
-    const result = await patchRequest(`${MODEL_NAME}/${groupId}/posts/${postId}`, postData);
+    const payload = {
+      content: postData.content || '',
+      tags: postData.tags || [],
+      mentions: postData.mentions || [],
+    };
+    if (postData.media && Array.isArray(postData.media)) {
+      payload.media = postData.media;
+    }
+    if (postData.status !== undefined) {
+      payload.status = postData.status;
+    }
+    if (postData.isPinned !== undefined) {
+      payload.isPinned = postData.isPinned;
+    }
+
+    const result = await patchRequest(`${MODEL_NAME}/${groupId}/posts/${postId}`, payload);
     return result;
   } catch (err) {
     throw err;
