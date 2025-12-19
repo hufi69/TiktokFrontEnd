@@ -86,7 +86,7 @@ const LoginScreen = ({ onBack, onSocial, onSubmit, onGoToSignup, onForgetPasswor
               {isLoading ? (
                 <ActivityIndicator size="small" color={colors.bg} />
               ) : (
-                <Text style={[styles.primaryText, !isFormValid && styles.primaryTextDisabled]}>Login</Text>
+              <Text style={[styles.primaryText, !isFormValid && styles.primaryTextDisabled]}>Login</Text>
               )}
             </TouchableOpacity>
 

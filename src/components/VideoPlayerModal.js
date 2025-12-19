@@ -37,6 +37,7 @@ const VideoPlayerModal = ({ visible, videoUri, onClose }) => {
   const [isLoading, setIsLoading] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [nativeModuleError, setNativeModuleError] = useState(false);
+  const [isPaused, setIsPaused] = useState(true); // Start paused, will be set to false when modal opens
   const videoRef = useRef(null);
   const fullVideoUri = videoUri && videoUri.startsWith('http') 
     ? videoUri 
@@ -45,15 +46,24 @@ const VideoPlayerModal = ({ visible, videoUri, onClose }) => {
   const canUseVideo = isVideoAvailable && Video && (typeof Video === 'function' || typeof Video === 'object');
 
   useEffect(() => {
+    console.log(' VideoPlayerModal useEffect:', { visible, videoUri: videoUri?.substring(0, 50), fullVideoUri: fullVideoUri?.substring(0, 50) });
     if (visible && videoUri) {
-      console.log('VideoPlayerModal opened:', {
+      console.log(' VideoPlayerModal opened:', {
         isVideoAvailable,
         hasVideo: !!Video,
         videoType: typeof Video,
         canUseVideo,
         nativeModuleError,
-        videoUri: fullVideoUri.substring(0, 50) + '...'
+        videoUri: fullVideoUri.substring(0, 80) + '...',
+        fullVideoUri: fullVideoUri
       });
+     
+      setIsLoading(true);
+      setHasError(false);
+      setIsPaused(false);
+    } else if (!visible) {
+    
+      setIsPaused(true);
     }
   }, [visible, videoUri, isVideoAvailable, Video, canUseVideo, nativeModuleError, fullVideoUri]);
 
@@ -127,15 +137,44 @@ const VideoPlayerModal = ({ visible, videoUri, onClose }) => {
               style={styles.video}
               controls={true}
               resizeMode="contain"
+              volume={1.0}
+              muted={false}
               onLoad={() => {
+                console.log('✅ Video loaded successfully:', fullVideoUri.substring(0, 80));
                 setIsLoading(false);
                 setHasError(false);
                 setNativeModuleError(false);
+                setIsPaused(false);
+              }}
+              onLoadStart={() => {
+                console.log('🔄 Video load started:', fullVideoUri.substring(0, 80));
+                setIsLoading(true);
+                setIsPaused(false);
+              }}
+              onReadyForDisplay={() => {
+                console.log('▶️ Video ready for display - starting playback');
+                setIsPaused(false);
+                setIsLoading(false);
+              }}
+              onBuffer={(data) => {
+                console.log('uffer:', data.isBuffering ? 'Buffering...' : 'Buffered');
+                if (data.isBuffering) {
+                  setIsLoading(true);
+                } else {
+                  setIsLoading(false);
+                }
+              }}
+              onProgress={(data) => {
+                // Video is playing if we're receiving progress updates
+                if (data.currentTime > 0 && isLoading) {
+                  console.log('▶️ Video is playing, currentTime:', data.currentTime.toFixed(2));
+                  setIsLoading(false);
+                }
               }}
               onError={(error) => {
                 console.error('Video playback error:', error);
                 const errorMessage = error?.nativeEvent?.error || error?.message || '';
-                // Check if it's a native module error
+              
                 if (errorMessage.includes('RCTVideo') || 
                     errorMessage.includes('View config not found') ||
                     errorMessage.includes('undefined is not an object')) {
@@ -146,8 +185,12 @@ const VideoPlayerModal = ({ visible, videoUri, onClose }) => {
                 }
                 setIsLoading(false);
               }}
-              paused={false}
+              paused={isPaused}
               repeat={false}
+              playInBackground={false}
+              playWhenInactive={false}
+              ignoreSilentSwitch="ignore"
+              key={fullVideoUri} 
             />
           )}
         </View>
@@ -243,4 +286,3 @@ const styles = StyleSheet.create({
 });
 
 export default VideoPlayerModal;
-

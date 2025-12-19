@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList, Alert, RefreshControl, Modal
 } from 'react-native';
@@ -8,6 +8,10 @@ import { colors } from '../../constants/theme';
 import { API_CONFIG } from '../../config/api';
 import VideoPlayerModal from '../../components/VideoPlayerModal';
 import ImagePreviewModal from '../../components/ImagePreviewModal';
+import ImageCarousel from '../../screens/HomeScreen/components/ImageCarousel';
+import { Dimensions } from 'react-native';
+
+const { width: screenWidth, height: screenHeight } = Dimensions.get('window');
 
 // Try to import react-native-video for thumbnail generation
 let Video = null;
@@ -177,6 +181,199 @@ const FollowButton = ({ userId, isFollowing, onToggleFollow, loading }) => {
   );
 };
 
+// Fullscreen Media Carousel Modal Component - Handles both images and videos
+const MediaCarouselModal = ({ media, currentIndex = 0, onClose }) => {
+  const [activeIndex, setActiveIndex] = useState(currentIndex);
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  const flatListRef = useRef(null);
+
+  useEffect(() => {
+    if (currentIndex !== activeIndex) {
+      setActiveIndex(currentIndex);
+      setTimeout(() => {
+        flatListRef.current?.scrollToIndex({ index: currentIndex, animated: false });
+      }, 100);
+    }
+  }, [currentIndex]);
+
+  const isVideo = (item) => {
+    if (!item) return false;
+    if (item.type === 'video' || item.type?.startsWith('video/')) return true;
+    const url = typeof item === 'string' ? item : item.url || '';
+    return url.includes('.mp4') || url.includes('.mov') || url.includes('.m4v') || url.includes('.webm');
+  };
+
+  const getMediaUri = (item) => {
+    if (typeof item === 'string') {
+      return item.startsWith('http') ? item : `${API_CONFIG.BASE_URL}${item}`;
+    }
+    if (item && typeof item === 'object' && item.url) {
+      const url = item.url;
+      return url.startsWith('http') ? url : `${API_CONFIG.BASE_URL}${url}`;
+    }
+    return null;
+  };
+
+  const handleScroll = (event) => {
+    const scrollPosition = event.nativeEvent.contentOffset.x;
+    const index = Math.round(scrollPosition / screenWidth);
+    setActiveIndex(index);
+  };
+
+  const renderMedia = ({ item, index }) => {
+    const mediaUri = getMediaUri(item);
+    const itemIsVideo = isVideo(item);
+
+    if (itemIsVideo) {
+      const videoUrl = typeof item === 'string' 
+        ? item 
+        : (item.url || mediaUri);
+      
+      const fullVideoUrl = videoUrl.startsWith('http') 
+        ? videoUrl 
+        : `${API_CONFIG.BASE_URL}${videoUrl}`;
+      
+      const thumbnail = item.thumbnailUrl || item.thumbnail;
+      const thumbnailUri = thumbnail
+        ? (thumbnail.startsWith('http') 
+            ? thumbnail 
+            : `${API_CONFIG.BASE_URL}${thumbnail}`)
+        : null;
+      const canUseVideoThumbnail = Video && (typeof Video === 'function' || typeof Video === 'object');
+
+      return (
+        <TouchableOpacity
+          style={mediaCarouselStyles.mediaContainer}
+          activeOpacity={0.9}
+          onPress={() => {
+           
+            setSelectedVideo(fullVideoUrl);
+          }}
+        >
+          {thumbnailUri ? (
+            <Image
+              source={{ uri: thumbnailUri }}
+              style={mediaCarouselStyles.media}
+              resizeMode="contain"
+            />
+          ) : canUseVideoThumbnail ? (
+            <View style={mediaCarouselStyles.videoThumbnailContainer}>
+              <Video
+                source={{ uri: fullVideoUrl }}
+                style={mediaCarouselStyles.media}
+                resizeMode="contain"
+                paused={true}
+                controls={false}
+                muted={true}
+                repeat={false}
+              />
+            </View>
+          ) : (
+            <View style={mediaCarouselStyles.videoPlaceholder}>
+              <Icon name="video-camera" size={64} color={colors.textLight} />
+              <Text style={mediaCarouselStyles.videoPlaceholderText}>Video</Text>
+            </View>
+          )}
+          <View style={mediaCarouselStyles.videoOverlay} pointerEvents="box-none">
+            <TouchableOpacity 
+              style={mediaCarouselStyles.playButton}
+              onPress={() => {
+               
+                setSelectedVideo(fullVideoUrl);
+              }}
+              activeOpacity={0.8}
+            >
+              <Icon name="play-circle" size={64} color="white" />
+            </TouchableOpacity>
+          </View>
+        </TouchableOpacity>
+      );
+    }
+
+    // For images, render normally with fullscreen sizing
+    return (
+      <View style={mediaCarouselStyles.mediaContainer}>
+        <Image
+          source={{ uri: mediaUri }}
+          style={mediaCarouselStyles.media}
+          resizeMode="contain"
+        />
+      </View>
+    );
+  };
+
+  if (!media || media.length === 0) return null;
+
+  return (
+    <>
+      <Modal
+        visible={!!media}
+        animationType="fade"
+        transparent={false}
+        onRequestClose={onClose}
+      >
+        <View style={mediaCarouselStyles.container}>
+          <View style={mediaCarouselStyles.header}>
+            <TouchableOpacity onPress={onClose} style={mediaCarouselStyles.closeButton}>
+              <Icon name="times" size={24} color="#fff" />
+            </TouchableOpacity>
+            {media.length > 1 && (
+              <Text style={mediaCarouselStyles.counter}>
+                {activeIndex + 1} / {media.length}
+              </Text>
+            )}
+            <View style={mediaCarouselStyles.headerSpacer} />
+          </View>
+
+          <FlatList
+            ref={flatListRef}
+            data={media}
+            renderItem={renderMedia}
+            keyExtractor={(_, index) => index.toString()}
+            horizontal
+            pagingEnabled
+            showsHorizontalScrollIndicator={false}
+            onScroll={handleScroll}
+            scrollEventThrottle={16}
+            getItemLayout={(_, index) => ({
+              length: screenWidth,
+              offset: screenWidth * index,
+              index,
+            })}
+            initialNumToRender={1}
+            maxToRenderPerBatch={3}
+            windowSize={5}
+            removeClippedSubviews={true}
+            initialScrollIndex={currentIndex}
+          />
+
+          {/* Dot Indicators */}
+          {media.length > 1 && (
+            <View style={mediaCarouselStyles.dotContainer}>
+              {media.map((_, index) => (
+                <View
+                  key={index}
+                  style={[
+                    mediaCarouselStyles.dot,
+                    index === activeIndex ? mediaCarouselStyles.activeDot : mediaCarouselStyles.inactiveDot
+                  ]}
+                />
+              ))}
+            </View>
+          )}
+        </View>
+      </Modal>
+
+      {/* Video Player Modal */}
+      <VideoPlayerModal
+        visible={!!selectedVideo}
+        videoUri={selectedVideo}
+        onClose={() => setSelectedVideo(null)}
+      />
+    </>
+  );
+};
+
 const UserListItem = ({ user, onPress, showFollowButton = false, isMutual = false }) => {
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(false);
@@ -198,7 +395,9 @@ const UserListItem = ({ user, onPress, showFollowButton = false, isMutual = fals
             <Text style={styles.mutualText}>mutual</Text>
           )}
         </View>
-        <Text style={styles.userListItemOccupation}>{user?.occupation || 'No occupation'}</Text>
+        <Text style={styles.userListItemOccupation}>
+          {user?.occupation || user?.user?.occupation }
+        </Text>
       </View>
       {showFollowButton && (
         <FollowButton
@@ -216,6 +415,8 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
   const [selectedVideo, setSelectedVideo] = useState(null);
   const [selectedImages, setSelectedImages] = useState(null);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const [selectedMedia, setSelectedMedia] = useState(null);
+  const [selectedMediaIndex, setSelectedMediaIndex] = useState(0);
 
   const isVideo = (media) => {
     if (!media) return false;
@@ -229,8 +430,9 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
     const images = media.filter(m => m.type === 'image' && m.url);
     const videos = media.filter(m => isVideo(m) && m.url);
     
-    // Get the first media item (image or video)
-    const firstMedia = images[0] || videos[0];
+    // Get the first media item - prioritize videos if they exist, otherwise use images
+    // This ensures videos are visible in the grid
+    const firstMedia = videos[0] || images[0];
     const hasMultipleMedia = media.length > 1;
     
     // Determine if first item is a video
@@ -259,16 +461,15 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
     const canUseVideoThumbnail = Video && (typeof Video === 'function' || typeof Video === 'object');
 
     const handlePress = () => {
-      if (firstIsVideo && videoUrl) {
-        // Open video player
-        setSelectedVideo(videoUrl);
-      } else if (images.length > 0) {
-        // Open image preview
-        const imageUrls = images.map(img => 
-          img.url.startsWith('http') ? img.url : `${API_CONFIG.BASE_URL}${img.url}`
+      // Show all media (images + videos) in a carousel, similar to home screen
+      // This ensures videos are visible when tapping on posts
+      if (media.length > 0) {
+        setSelectedMedia(media);
+        // Find the index of the first media item we're showing
+        const firstIndex = media.findIndex(m => 
+          firstMedia && m.url === firstMedia.url
         );
-        setSelectedImages(imageUrls);
-        setSelectedImageIndex(0);
+        setSelectedMediaIndex(firstIndex >= 0 ? firstIndex : 0);
       } else {
         // Fallback to post press handler
         onPostPress(item);
@@ -310,8 +511,18 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
                 <Icon name="video-camera" size={24} color={colors.textLight} />
               </View>
             )}
-            <View style={styles.postGridVideoOverlay}>
-              <Icon name="play-circle" size={24} color="white" />
+            <View style={styles.postGridVideoOverlay} pointerEvents="box-none">
+              <TouchableOpacity 
+                style={{ justifyContent: 'center', alignItems: 'center' }}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  console.log('🎯 Profile grid play button pressed, opening media carousel');
+                  handlePress();
+                }}
+                activeOpacity={0.8}
+              >
+                <Icon name="play-circle" size={24} color="white" />
+              </TouchableOpacity>
             </View>
           </>
         ) : (
@@ -367,16 +578,28 @@ const PostGrid = ({ posts, onPostPress, refreshing, onRefresh, onCreatePost, isO
         )}
       />
       
-      {/* Video Player Modal */}
+      {/* Media Carousel Modal - Shows all media (images + videos) in fullscreen */}
+      {selectedMedia && selectedMedia.length > 0 && (
+        <MediaCarouselModal
+          media={selectedMedia}
+          currentIndex={selectedMediaIndex}
+          onClose={() => {
+            setSelectedMedia(null);
+            setSelectedMediaIndex(0);
+          }}
+        />
+      )}
+      
+      {/* Video Player Modal - Fallback for single video */}
       <VideoPlayerModal
-        visible={!!selectedVideo}
+        visible={!!selectedVideo && !selectedMedia}
         videoUri={selectedVideo}
         onClose={() => setSelectedVideo(null)}
       />
       
-      {/* Image Preview Modal */}
+      {/* Image Preview Modal - Fallback for images only */}
       <ImagePreviewModal
-        visible={!!selectedImages}
+        visible={!!selectedImages && !selectedMedia}
         images={selectedImages || []}
         currentIndex={selectedImageIndex}
         onClose={() => {
@@ -420,7 +643,7 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     return user.isMutual || (userIdStr && followingIds.has(userIdStr));
   };
 
-  // For following list: mutual if they also follow the profile owner back
+ 
   const getIsMutualForFollowing = (user) => {
     const userIdStr = user._id?.toString();
     return user.isMutual || (userIdStr && followerIds.has(userIdStr));
@@ -849,6 +1072,110 @@ const ProfileScreen = ({ navigation, route, onBack, onEditProfile, onSettings, o
     </SafeAreaView>
   );
 };
+
+// Media Carousel Modal Styles
+const mediaCarouselStyles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: '#000',
+  },
+  header: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    zIndex: 10,
+    paddingTop: 50,
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+  },
+  closeButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  counter: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  headerSpacer: {
+    width: 40,
+  },
+  mediaContainer: {
+    width: screenWidth,
+    height: screenHeight,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: '#000',
+  },
+  media: {
+    width: screenWidth,
+    height: screenHeight,
+  },
+  videoThumbnailContainer: {
+    width: screenWidth,
+    height: screenHeight,
+    overflow: 'hidden',
+    backgroundColor: '#000',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  playButton: {
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlaceholder: {
+    width: screenWidth,
+    height: screenHeight,
+    backgroundColor: '#000',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoPlaceholderText: {
+    marginTop: 8,
+    fontSize: 16,
+    color: colors.textLight,
+    fontWeight: '500',
+  },
+  dotContainer: {
+    position: 'absolute',
+    bottom: 30,
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    justifyContent: 'center',
+    alignItems: 'center',
+    gap: 6,
+  },
+  dot: {
+    width: 6,
+    height: 6,
+    borderRadius: 3,
+  },
+  activeDot: {
+    backgroundColor: '#fff',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  inactiveDot: {
+    backgroundColor: 'rgba(255, 255, 255, 0.5)',
+  },
+});
 
 const styles = StyleSheet.create({
   container: {

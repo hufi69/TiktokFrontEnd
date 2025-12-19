@@ -44,6 +44,9 @@ const initialState = {
   
   // Inbox
   unreadInboxCount: 0,
+  
+  // Temporary profile data (for preserving form data when navigating back)
+  tempProfileData: null,
 };
 
 const uiSlice = createSlice({
@@ -157,8 +160,22 @@ const uiSlice = createSlice({
     setUnreadInboxCount: (state, action) => {
       state.unreadInboxCount = action.payload;
     },
+    incrementInboxCount: (state) => {
+      state.unreadInboxCount += 1;
+    },
+    decrementInboxCount: (state) => {
+      state.unreadInboxCount = Math.max(0, state.unreadInboxCount - 1);
+    },
     resetInboxCount: (state) => {
       state.unreadInboxCount = 0;
+    },
+    
+    // Temporary profile data actions
+    setTempProfileData: (state, action) => {
+      state.tempProfileData = action.payload;
+    },
+    clearTempProfileData: (state) => {
+      state.tempProfileData = null;
     },
     
     // Reset UI state
@@ -182,6 +199,7 @@ const uiSlice = createSlice({
       state.keyboardHeight = 0;
       state.unreadNotificationCount = 0;
       state.unreadInboxCount = 0;
+      state.tempProfileData = null;
     },
   },
 });
@@ -215,7 +233,11 @@ export const {
   decrementNotificationCount,
   resetNotificationCount,
   setUnreadInboxCount,
+  incrementInboxCount,
+  decrementInboxCount,
   resetInboxCount,
+  setTempProfileData,
+  clearTempProfileData,
   resetUI,
 } = uiSlice.actions;
 

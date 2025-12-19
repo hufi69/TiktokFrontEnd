@@ -20,13 +20,12 @@ import { CONFIG } from '../../config';
 import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
 import { fetchGroup, fetchGroupPosts, joinGroup, fetchGroupMembers, deleteGroup } from '../../store/slices/groupsSlice';
 
-const DEFAULT_GROUP_IMAGE = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=200&fit=crop';
-
 const getGroupImageUrl = (image) => {
-  if (!image) return DEFAULT_GROUP_IMAGE;
+  if (!image) return null;
   if (/^https?:\/\//.test(image)) return image;
   const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
-  return `${baseUrl}/public/img/groups/${image}`;
+  // Backend saves to /public/uploads/groups/ based on the route code
+  return `${baseUrl}${image.startsWith('/') ? image : `/${image}`}`;
 };
 
 const GroupDetailScreen = ({ 
@@ -207,20 +206,30 @@ const GroupDetailScreen = ({
   const renderHeader = () => (
     <View>
       {/* Cover Image */}
-      <Image 
-        source={{ uri: getGroupImageUrl(group?.coverImage) }}
-        style={styles.coverImage}
-        resizeMode="cover"
-      />
+      {getGroupImageUrl(group?.coverImage) ? (
+        <Image 
+          source={{ uri: getGroupImageUrl(group?.coverImage) }}
+          style={styles.coverImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.coverImagePlaceholder}>
+          <Icon name="image" size={48} color={colors.textLight} />
+        </View>
+      )}
       
       {/* Group Info */}
       <View style={styles.infoContainer}>
         <View style={styles.profileSection}>
-          {group?.profileImage && (
+          {getGroupImageUrl(group?.profileImage) ? (
             <Image 
               source={{ uri: getGroupImageUrl(group.profileImage) }}
               style={styles.profileImage}
             />
+          ) : (
+            <View style={styles.profileImagePlaceholder}>
+              <Icon name="users" size={32} color={colors.textLight} />
+            </View>
           )}
           <View style={styles.groupInfo}>
             <View style={styles.nameRow}>
@@ -282,31 +291,38 @@ const GroupDetailScreen = ({
           <View style={{ width: 30 }} />
         </View>
         
-        {/* Group Header Info */}
-        {renderHeader()}
-        
-        {/* Restricted Access Message */}
-        <View style={styles.restrictedContainer}>
-          <Icon name="lock" size={64} color={colors.textLight} />
-          <Text style={styles.restrictedTitle}>Private Group</Text>
-          <Text style={styles.restrictedMessage}>
-            Can't access the group. Please join the group to get the access.
-          </Text>
-          <TouchableOpacity 
-            style={[styles.restrictedJoinButton, joining && styles.joinButtonDisabled]}
-            onPress={handleJoin}
-            disabled={joining}
-          >
-            {joining ? (
-              <ActivityIndicator size="small" color="#fff" />
-            ) : (
-              <>
-                <Icon name="user-plus" size={18} color="#fff" />
-                <Text style={styles.restrictedJoinButtonText}>Join Group</Text>
-              </>
-            )}
-          </TouchableOpacity>
-        </View>
+        <ScrollView 
+          style={styles.scrollView}
+          contentContainerStyle={styles.scrollContent}
+          showsVerticalScrollIndicator={true}
+          keyboardShouldPersistTaps="handled"
+        >
+          {/* Group Header Info */}
+          {renderHeader()}
+          
+          {/* Restricted Access Message */}
+          <View style={styles.restrictedContainer}>
+            <Icon name="lock" size={64} color={colors.textLight} />
+            <Text style={styles.restrictedTitle}>Private Group</Text>
+            <Text style={styles.restrictedMessage}>
+              Can't access the group. Please join the group to get the access.
+            </Text>
+            <TouchableOpacity 
+              style={[styles.restrictedJoinButton, joining && styles.joinButtonDisabled]}
+              onPress={handleJoin}
+              disabled={joining}
+            >
+              {joining ? (
+                <ActivityIndicator size="small" color="#fff" />
+              ) : (
+                <>
+                  <Icon name="user-plus" size={18} color="#fff" />
+                  <Text style={styles.restrictedJoinButtonText}>Join Group</Text>
+                </>
+              )}
+            </TouchableOpacity>
+          </View>
+        </ScrollView>
       </SafeAreaView>
     );
   }
@@ -471,6 +487,13 @@ const styles = StyleSheet.create({
   menuButton: {
     padding: spacing.xs,
   },
+  coverImagePlaceholder: {
+    width: '100%',
+    height: 200,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
   coverImage: {
     width: '100%',
     height: 200,
@@ -483,6 +506,16 @@ const styles = StyleSheet.create({
   profileSection: {
     flexDirection: 'row',
     marginBottom: spacing.m,
+  },
+  profileImagePlaceholder: {
+    width: 80,
+    height: 80,
+    borderRadius: 40,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 4,
+    borderColor: colors.bg,
   },
   profileImage: {
     width: 80,
@@ -593,11 +626,17 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginTop: spacing.xs,
   },
-  restrictedContainer: {
+  scrollView: {
     flex: 1,
+  },
+  scrollContent: {
+    paddingBottom: spacing.xl * 2,
+  },
+  restrictedContainer: {
     justifyContent: 'center',
     alignItems: 'center',
     padding: spacing.xl,
+    minHeight: 400,
   },
   restrictedTitle: {
     fontSize: 24,

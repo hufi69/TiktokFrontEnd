@@ -14,12 +14,24 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import { useAppDispatch } from '../../hooks/hooks';
 import { updatePostAsync } from '../../store/slices/postsSlice';
 import { colors } from '../../constants/theme';
+import { CONFIG } from '../../config';
+import VideoPlayerModal from '../../components/VideoPlayerModal';
+
+// Try to import react-native-video
+let Video = null;
+try {
+  const videoModule = require('react-native-video');
+  Video = videoModule.default || videoModule;
+} catch (e) {
+  // Video module not available
+}
 
 const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
   const dispatch = useAppDispatch();
   const [content, setContent] = useState(post?.caption || '');
   const [isLoading, setIsLoading] = useState(false);
-
+  const [selectedVideo, setSelectedVideo] = useState(null);
+  
   useEffect(() => {
     if (post) {
       console.log('Post data for editing:', post);
@@ -84,23 +96,118 @@ const EditPostScreen = ({ onBack, post, onPostUpdated }) => {
           textAlignVertical="top"
         />
 
-        {/* Image Preview - Read Only */}
-        {post?.images && post.images.length > 0 && (
-          <View style={styles.imagePreviewContainer}>
-            <Text style={styles.imagePreviewTitle}>Images ({post.images.length})</Text>
-         
-            <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.imagePreview}>
-              {post.images.map((imageUri, index) => {
-                // post.images is an array of URL strings
-                if (!imageUri || typeof imageUri !== 'string') return null;
-                return (
-                <View key={index} style={styles.imagePreviewItem}>
-                    <Image source={{ uri: imageUri }} style={styles.imagePreviewImage} />
-                </View>
-                );
-              })}
-            </ScrollView>
-          </View>
+        {/* Media Preview - Read Only (Images and Videos) */}
+        {(() => {
+          // Get media from post - could be in post.media, post.images, or post.videos
+          const media = post?.media || [];
+          const images = post?.images || [];
+          const videos = post?.videos || [];
+          
+          // Combine all media items
+          const allMedia = media.length > 0 
+            ? media 
+            : [...images.map(img => ({ type: 'image', url: img })), ...videos.map(vid => ({ type: 'video', url: vid }))];
+          
+          if (allMedia.length === 0) return null;
+          
+          const isVideo = (item) => {
+            if (!item) return false;
+            if (item.type === 'video' || item.type?.startsWith('video/')) return true;
+            const url = typeof item === 'string' ? item : item.url || '';
+            return url.includes('.mp4') || url.includes('.mov') || url.includes('.m4v') || url.includes('.webm');
+          };
+          
+          const getMediaUrl = (item) => {
+            if (typeof item === 'string') {
+              return item.startsWith('http') ? item : `${CONFIG.API_BASE_URL}${item}`;
+            }
+            if (item && typeof item === 'object' && item.url) {
+              const url = item.url;
+              return url.startsWith('http') ? url : `${CONFIG.API_BASE_URL}${url}`;
+            }
+            return null;
+          };
+          
+          const imageCount = allMedia.filter(m => !isVideo(m)).length;
+          const videoCount = allMedia.filter(m => isVideo(m)).length;
+          
+          return (
+            <View style={styles.mediaPreviewContainer}>
+              <Text style={styles.mediaPreviewTitle}>
+                Media ({allMedia.length}) {imageCount > 0 && `• ${imageCount} image${imageCount > 1 ? 's' : ''}`} {videoCount > 0 && `• ${videoCount} video${videoCount > 1 ? 's' : ''}`}
+              </Text>
+              <Text style={styles.mediaPreviewNote}>Media cannot be edited</Text>
+              
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.mediaPreview}>
+                {allMedia.map((item, index) => {
+                  const itemIsVideo = isVideo(item);
+                  const mediaUrl = getMediaUrl(item);
+                  
+                  if (!mediaUrl) return null;
+                  
+                  if (itemIsVideo) {
+                    const thumbnail = item.thumbnailUrl || item.thumbnail;
+                    const thumbnailUri = thumbnail
+                      ? (thumbnail.startsWith('http') ? thumbnail : `${CONFIG.API_BASE_URL}${thumbnail}`)
+                      : null;
+                    const canUseVideoThumbnail = Video && (typeof Video === 'function' || typeof Video === 'object');
+                    const fullVideoUrl = mediaUrl.startsWith('http') ? mediaUrl : `${CONFIG.API_BASE_URL}${mediaUrl}`;
+                    
+                    return (
+                      <TouchableOpacity
+                        key={index}
+                        style={styles.mediaPreviewItem}
+                        onPress={() => setSelectedVideo(fullVideoUrl)}
+                        activeOpacity={0.9}
+                      >
+                        {thumbnailUri ? (
+                          <Image
+                            source={{ uri: thumbnailUri }}
+                            style={styles.mediaPreviewImage}
+                            resizeMode="cover"
+                          />
+                        ) : canUseVideoThumbnail ? (
+                          <View style={styles.videoThumbnailContainer}>
+                            <Video
+                              source={{ uri: fullVideoUrl }}
+                              style={styles.mediaPreviewImage}
+                              resizeMode="cover"
+                              paused={true}
+                              controls={false}
+                              muted={true}
+                              repeat={false}
+                            />
+                          </View>
+                        ) : (
+                          <View style={styles.videoPlaceholder}>
+                            <Icon name="video-camera" size={24} color={colors.textLight} />
+                          </View>
+                        )}
+                        <View style={styles.videoOverlay}>
+                          <Icon name="play-circle" size={20} color="white" />
+                        </View>
+                      </TouchableOpacity>
+                    );
+                  } else {
+                    return (
+                      <View key={index} style={styles.mediaPreviewItem}>
+                        <Image source={{ uri: mediaUrl }} style={styles.mediaPreviewImage} />
+                      </View>
+                    );
+                  }
+                })}
+              </ScrollView>
+            </View>
+          );
+        })()}
+        
+        {/* Video Player Modal */}
+        {selectedVideo && (
+          <VideoPlayerModal
+            videoUri={selectedVideo}
+            visible={!!selectedVideo}
+            onClose={() => setSelectedVideo(null)}
+          />
         )}
 
       
@@ -156,31 +263,57 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     marginBottom: 16,
   },
-  imagePreviewContainer: {
+  mediaPreviewContainer: {
     marginBottom: 16,
   },
-  imagePreviewTitle: {
+  mediaPreviewTitle: {
     fontSize: 16,
     fontWeight: '600',
     color: colors.text,
     marginBottom: 4,
   },
-  imagePreviewNote: {
+  mediaPreviewNote: {
     fontSize: 12,
-    color: colors.muted,
+    color: colors.textLight,
     marginBottom: 8,
     fontStyle: 'italic',
   },
-  imagePreview: {
+  mediaPreview: {
     flexDirection: 'row',
   },
-  imagePreviewItem: {
+  mediaPreviewItem: {
     marginRight: 12,
     position: 'relative',
   },
-  imagePreviewImage: {
-    width: 80,
-    height: 80,
+  mediaPreviewImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+  },
+  videoThumbnailContainer: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    overflow: 'hidden',
+    backgroundColor: colors.surface,
+  },
+  videoPlaceholder: {
+    width: 100,
+    height: 100,
+    borderRadius: 8,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
     borderRadius: 8,
   },
   bottomSaveContainer: {

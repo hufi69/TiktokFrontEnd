@@ -18,8 +18,16 @@ import BackButton from '../../components/common/BackButton';
 import AuthInput from '../AuthScreen/components/AuthInput';
 import { colors } from '../../constants/theme';
 import { API_CONFIG } from '../../config/api';
+import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
+import { setTempProfileData, clearTempProfileData } from '../../store/slices/uiSlice';
+
 
 const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, isSignupFlow = false, onEditCountry }) => {
+  const dispatch = useAppDispatch();
+  const { tempProfileData } = useAppSelector(state => state.ui);
+  
+  // Use tempProfileData if available (when navigating back), otherwise use userData
+  const initialData = tempProfileData || userData;
   // Helper function to format date for display (extract YYYY-MM-DD from ISO or keep YYYY-MM-DD)
   const formatDateForDisplay = (dateStr) => {
     if (!dateStr) return '';
@@ -82,50 +90,84 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, i
   };
 
   const [profileImage, setProfileImage] = useState(() => {
-    if (isEditMode && userData?.profilePicture) {
-      return getProfileImageUri(userData.profilePicture);
+    if (tempProfileData?.profileImage) {
+      return typeof tempProfileData.profileImage === 'object' && tempProfileData.profileImage.uri
+        ? tempProfileData.profileImage
+        : getProfileImageUri(tempProfileData.profileImage);
+    }
+    if (isEditMode && initialData?.profilePicture) {
+      return getProfileImageUri(initialData.profilePicture);
     }
     return null;
   });
-  const [fullName, setFullName] = useState(userData?.fullName || '');
-  const [username, setUsername] = useState(userData?.userName || '');
-  const [dateOfBirth, setDateOfBirth] = useState(formatDateForDisplay(userData?.dateOfBirth));
+  const [fullName, setFullName] = useState(initialData?.fullName || '');
+  const [username, setUsername] = useState(initialData?.userName || '');
+  const [dateOfBirth, setDateOfBirth] = useState(formatDateForDisplay(initialData?.dateOfBirth));
   // Email should be auto-filled from signup and read-only during signup flow only
-  const [email, setEmail] = useState(userData?.email || '');
+  const [email, setEmail] = useState(initialData?.email || '');
   
   // Auto-fill email if it's signup flow and email is provided
   useEffect(() => {
-    if (isSignupFlow && userData?.email) {
-      setEmail(userData.email);
-    } else if (isEditMode && userData?.email) {
-      setEmail(userData.email);
+    if (isSignupFlow && initialData?.email) {
+      setEmail(initialData.email);
+    } else if (isEditMode && initialData?.email) {
+      setEmail(initialData.email);
     }
-  }, [isSignupFlow, isEditMode, userData?.email]);
+  }, [isSignupFlow, isEditMode, initialData?.email]);
+  
+  // Save form data to Redux whenever it changes (for preserving when navigating back)
+  useEffect(() => {
+    if (isSignupFlow && (fullName || username || dateOfBirth || phoneNumber || occupation || profileImage)) {
+      // Format phone number inline
+      const cleaned = phoneNumber.replace(/\D/g, '');
+      let formattedPhone = '';
+      if (cleaned.length > 0) {
+        if (cleaned.length <= 3) {
+          formattedPhone = `(${cleaned}`;
+        } else if (cleaned.length <= 6) {
+          formattedPhone = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3)}`;
+        } else {
+          formattedPhone = `(${cleaned.slice(0, 3)}) ${cleaned.slice(3, 6)}-${cleaned.slice(6, 10)}`;
+        }
+      }
+      
+      const formData = {
+        profileImage,
+        fullName,
+        userName: username,
+        dateOfBirth,
+        email,
+        phone: `${countryCode} ${formattedPhone}`,
+        occupation,
+      };
+      dispatch(setTempProfileData(formData));
+    }
+  }, [fullName, username, dateOfBirth, email, phoneNumber, countryCode, occupation, profileImage, isSignupFlow, dispatch]);
 
   // Parse phone number when loading in edit mode
-  const parsedPhone = parsePhoneNumber(userData?.phone || userData?.phoneNumber);
+  const parsedPhone = parsePhoneNumber(initialData?.phone || initialData?.phoneNumber);
   const [phoneNumber, setPhoneNumber] = useState(parsedPhone.number);
   const [countryCode, setCountryCode] = useState(parsedPhone.countryCode);
-  const [occupation, setOccupation] = useState(userData?.occupation || '');
+  const [occupation, setOccupation] = useState(initialData?.occupation || '');
   const [focusedField, setFocusedField] = useState(null);
 
   // Update profile image when userData changes (for edit mode)
   useEffect(() => {
-    if (isEditMode && userData?.profilePicture) {
-      const imageUri = getProfileImageUri(userData.profilePicture);
+    if (isEditMode && initialData?.profilePicture) {
+      const imageUri = getProfileImageUri(initialData.profilePicture);
       setProfileImage(imageUri);
     }
-  }, [isEditMode, userData?.profilePicture]);
+  }, [isEditMode, initialData?.profilePicture]);
 
   // Update phone number when userData changes
   useEffect(() => {
-    const phone = userData?.phone || userData?.phoneNumber;
+    const phone = initialData?.phone || initialData?.phoneNumber;
     if (phone) {
       const parsed = parsePhoneNumber(phone);
       setPhoneNumber(parsed.number);
       setCountryCode(parsed.countryCode);
     }
-  }, [userData?.phone, userData?.phoneNumber]);
+  }, [initialData?.phone, initialData?.phoneNumber]);
 
   // Refs for input navigation
   const usernameRef = useRef(null);
@@ -407,7 +449,7 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, i
               keyboardType="numeric"
               maxLength={10}
               returnKeyType="next"
-              onSubmitEditing={() => emailRef.current?.focus()}
+              onSubmitEditing={() => phoneRef.current?.focus()}
               blurOnSubmit={false}
             />
 
@@ -487,15 +529,23 @@ const FillProfileScreen = ({ onBack, onContinue, userData, isEditMode = false, i
           {/* Continue Button */}
           <TouchableOpacity 
             style={[styles.continueButton, !isFormValid && styles.continueButtonDisabled]} 
-            onPress={() => isFormValid && onContinue?.({
-              profileImage,
-              fullName,
-              username,
-              dateOfBirth,
-              email,
-              phone: `${countryCode} ${formatPhoneNumber(phoneNumber)}`,
-              occupation
-            })}
+            onPress={() => {
+              if (isFormValid) {
+                // Clear temp data when successfully continuing
+                if (isSignupFlow) {
+                  dispatch(clearTempProfileData());
+                }
+                onContinue?.({
+                  profileImage,
+                  fullName,
+                  username,
+                  dateOfBirth,
+                  email,
+                  phone: `${countryCode} ${formatPhoneNumber(phoneNumber)}`,
+                  occupation
+                });
+              }
+            }}
             disabled={!isFormValid}
           >
             <Text style={[styles.continueText, !isFormValid && styles.continueTextDisabled]}>

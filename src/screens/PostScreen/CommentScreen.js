@@ -642,7 +642,12 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['top']}>
+    <SafeAreaView style={styles.container} edges={Platform.OS === 'ios' ? ['top'] : ['top']}>
+      <KeyboardAvoidingView
+        style={{ flex: 1 }}
+        behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
+      >
         <View style={styles.topBar}>
           <TouchableOpacity onPress={onBack} hitSlop={8}>
             <Icon name="chevron-left" size={22} color={colors.text} />
@@ -651,56 +656,54 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
           <View style={{ width: 22 }} />
         </View>
 
-      <View style={{ flex: 1 }}>
-        <FlashList
-          data={comments}
-          keyExtractor={(item, index) => getId(item) || String(index)}
-          renderItem={renderItem}
-          contentContainerStyle={styles.listContent}
-          ListFooterComponent={cursor ? <Text style={styles.footerLoading}>Loading…</Text> : null}
-          refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
-          onEndReachedThreshold={0.3}
-          onEndReached={loadMore}
-          showsVerticalScrollIndicator={false}
-          estimatedItemSize={72}
-          keyboardShouldPersistTaps="handled"
-        />
+        <View style={{ flex: 1 }}>
+          <FlashList
+            data={comments}
+            keyExtractor={(item, index) => getId(item) || String(index)}
+            renderItem={renderItem}
+            contentContainerStyle={styles.listContent}
+            ListFooterComponent={cursor ? <Text style={styles.footerLoading}>Loading…</Text> : null}
+            refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
+            onEndReachedThreshold={0.3}
+            onEndReached={loadMore}
+            showsVerticalScrollIndicator={false}
+            estimatedItemSize={72}
+            keyboardShouldPersistTaps="handled"
+          />
 
-        {/* Edit Comment Modal */}
-        <Modal
-          animationType="slide"
-          transparent={true}
-          visible={isEditModalVisible}
-          onRequestClose={() => setEditModalVisible(false)}
-        >
-          <View style={styles.modalContainer}>
-            <View style={styles.modalContent}>
-              <Text style={styles.modalTitle}>Edit Comment</Text>
-              <TextInput
-                value={editedContent}
-                onChangeText={setEditedContent}
-                style={styles.modalInput}
-                multiline
-                maxLength={1000}
-              />
-              <View style={styles.modalActions}>
-                <TouchableOpacity style={styles.modalButton} onPress={() => setEditModalVisible(false)}>
-                  <Text style={styles.modalButtonText}>Cancel</Text>
-                </TouchableOpacity>
-                <TouchableOpacity style={[styles.modalButton, styles.modalButtonSave]} onPress={handleUpdateComment}>
-                  <Text style={[styles.modalButtonText, styles.modalButtonTextSave]}>Save</Text>
-                </TouchableOpacity>
+          {/* Edit Comment Modal */}
+          <Modal
+            animationType="slide"
+            transparent={true}
+            visible={isEditModalVisible}
+            onRequestClose={() => setEditModalVisible(false)}
+          >
+            <View style={styles.modalContainer}>
+              <View style={styles.modalContent}>
+                <Text style={styles.modalTitle}>Edit Comment</Text>
+                <TextInput
+                  value={editedContent}
+                  onChangeText={setEditedContent}
+                  style={styles.modalInput}
+                  multiline
+                  maxLength={1000}
+                />
+                <View style={styles.modalActions}>
+                  <TouchableOpacity style={styles.modalButton} onPress={() => setEditModalVisible(false)}>
+                    <Text style={styles.modalButtonText}>Cancel</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={[styles.modalButton, styles.modalButtonSave]} onPress={handleUpdateComment}>
+                    <Text style={[styles.modalButtonText, styles.modalButtonTextSave]}>Save</Text>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
-          </View>
-        </Modal>
-      </View>
+          </Modal>
+        </View>
 
-      {(() => {
-        const composerContent = (
         <View style={[
           styles.composer, 
-            replyTo && styles.composerReply
+          replyTo && styles.composerReply
         ]}>
           {replyTo ? (
             <View style={styles.replyPill}>
@@ -730,19 +733,7 @@ const CommentScreen = ({ onBack, postId, post, onPostUpdated, onCommentCountUpda
             </TouchableOpacity>
           </View>
         </View>
-        );
-
-        return Platform.OS === 'ios' ? (
-          <KeyboardAvoidingView 
-            behavior="padding"
-            keyboardVerticalOffset={0}
-          >
-            {composerContent}
       </KeyboardAvoidingView>
-        ) : (
-          composerContent
-        );
-      })()}
     </SafeAreaView>
   );
 };

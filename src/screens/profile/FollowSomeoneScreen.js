@@ -83,8 +83,12 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
   const dispatch = useAppDispatch();
   const { allUsers, isLoading } = useAppSelector(state => state.user);
   const { user: currentUser } = useAppSelector(state => state.auth);
+  const { followSomeoneSource } = useAppSelector(state => state.ui);
   const [searchQuery, setSearchQuery] = useState('');
   const [processingUserId, setProcessingUserId] = useState(null);
+  
+  // Hide back button during onboarding flow (when source is 'onboarding' or null)
+  const showBackButton = followSomeoneSource === 'profile';
 
   useEffect(() => {
     dispatch(fetchAllUsers());
@@ -179,7 +183,8 @@ const FollowSomeoneScreen = ({ onBack, onContinue, onUserProfilePress }) => {
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <BackButton onPress={onBack} />
+          {showBackButton && <BackButton onPress={onBack} />}
+          {!showBackButton && <View style={{ width: 40 }} />}
           <Text style={styles.title}>Follow Someone</Text>
         </View>
         {/* Search Bar */}

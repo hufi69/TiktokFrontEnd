@@ -40,7 +40,7 @@ import {
 
 
 import { useAppDispatch, useCurrentScreen, useAuthLoading, useAuthError, useAppSelector } from './src/hooks/hooks';
-import { setCurrentScreen, setSelectedUserId, setSelectedChatUser, setFollowSomeoneSource, incrementNotificationCount, setUnreadNotificationCount } from './src/store/slices/uiSlice';
+import { setCurrentScreen, setSelectedUserId, setSelectedChatUser, setFollowSomeoneSource, incrementNotificationCount, setUnreadNotificationCount, setUnreadInboxCount, incrementInboxCount, clearTempProfileData } from './src/store/slices/uiSlice';
 import { loginUser, signupUser, updateUserCountry, loadStoredAuth, verifyOTP, verifyResetPasswordOTP, verifyToken, logoutUser, googleLogin } from './src/store/slices/authSlice';
 import { updateUserProfile } from './src/store/slices/userSlice';
 import { updateCommentCount } from './src/store/slices/postsSlice';
@@ -50,6 +50,8 @@ import CreatePostScreen from './src/screens/PostScreen/CreatePostScreen';
 import CommentScreen from './src/screens/PostScreen/CommentScreen';
 import EditPostScreen from './src/screens/PostScreen/EditPostScreen';
 import socketService from './src/services/socket/socketService';
+import { getNotifications } from './src/services/api/notificationApi';
+import { getUserChats } from './src/services/api/chatApi';
 
 function AppContent() {
   const dispatch = useAppDispatch();
@@ -80,17 +82,63 @@ function AppContent() {
         console.log('✅ Valid token and user found, navigating to home');
         dispatch(setCurrentScreen('home'));
         
+        const loadedUser = loadResult.payload;
+        const loadedUserId = loadedUser._id || loadedUser.id;
 
-        socketService.connect().then(() => {
+        socketService.connect().then(async () => {
+          // Fetch initial notification count
+          try {
+            const notificationsResponse = await getNotifications();
+            const notifications = notificationsResponse?.notifications || [];
+            const unreadNotificationCount = notifications.filter(n => !n.read).length;
+            dispatch(setUnreadNotificationCount(unreadNotificationCount));
+            console.log('📊 Initial notification count:', unreadNotificationCount);
+          } catch (error) {
+            console.log('⚠️ Failed to fetch initial notification count:', error);
+          }
+
+          // Fetch initial inbox count
+          try {
+            const chatsResponse = await getUserChats();
+            const chatsData = chatsResponse?.data?.chats || [];
+            const totalUnread = chatsData.reduce((sum, chat) => {
+              const lastMessageSenderId = chat.lastMessage?.senderId;
+              const isLastMessageFromOther = lastMessageSenderId && 
+                lastMessageSenderId !== loadedUserId && 
+              
+                lastMessageSenderId !== loadedUser.id;
+              const unreadCount = chat.unreadCount || (isLastMessageFromOther ? 1 : 0);
+              return sum + unreadCount;
+            }, 0);
+            dispatch(setUnreadInboxCount(totalUnread));
+            console.log(' Initial inbox count:', totalUnread);
+          } catch (error) {
+            console.log(' Failed to fetch initial inbox count:', error);
+          }
+
+          // Listen for new notifications
           socketService.on('new_notification', (notification) => {
             console.log('📬 New notification received:', notification);
             dispatch(incrementNotificationCount());
           });
           
+          // Listen for notification count updates from server
           socketService.on('notification_count', (data) => {
             console.log('📊 Notification count update from server:', data);
             if (typeof data.count === 'number') {
               dispatch(setUnreadNotificationCount(data.count));
+            }
+          });
+
+          // Listen for new messages to update inbox count
+          socketService.on('new_message', (message) => {
+            console.log('💬 New message received via socket:', message);
+            // Only increment if message is not from current user
+            const isFromCurrentUser = message.sender === loadedUserId || 
+                                     message.senderId === loadedUserId ||
+                                     (typeof message.sender === 'object' && message.sender._id === loadedUserId);
+            if (!isFromCurrentUser) {
+              dispatch(incrementInboxCount());
             }
           });
         }).catch((error) => {
@@ -487,6 +535,9 @@ function AppContent() {
       
       if (updateUserProfile.fulfilled.match(result)) {
         console.log('Profile updated successfully!');
+        
+        // Clear temp profile data after successful update
+        dispatch(clearTempProfileData());
         
         dispatch(setCurrentScreen('followSomeone'));
       } else if (updateUserProfile.rejected.match(result)) {

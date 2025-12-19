@@ -59,7 +59,13 @@ const GroupsScreen = ({ onBack, onCreateGroup, onGroupPress }) => {
     if (!query.trim()) return;
     setIsSearching(true);
     try {
-      const results = await dispatch(searchGroups({ query, params: { privacy: activeTab === 'myGroups' ? undefined : 'public' } })).unwrap();
+      const results = await dispatch(searchGroups({ 
+        query, 
+        params: { 
+          isMyGroups: activeTab === 'myGroups',
+          privacy: activeTab === 'myGroups' ? undefined : 'public' 
+        } 
+      })).unwrap();
       setSearchResults(results);
     } catch (error) {
       console.error('Search error:', error);

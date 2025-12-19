@@ -454,7 +454,7 @@ const FullHomeScreen = ({ onLogout, onProfilePress, onCreatePost, onViewComments
             onPress={() => onActivityPress?.()}
           >
             <View style={styles.notificationIconContainer}>
-              <Icon name="heart-o" size={24} color={colors.pink} />
+            <Icon name="heart-o" size={24} color={colors.pink} />
               {unreadNotificationCount > 0 && (
                 <View style={styles.notificationBadge}>
                   <Text style={styles.notificationBadgeText}>

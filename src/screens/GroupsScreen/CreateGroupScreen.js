@@ -55,26 +55,17 @@ const CreateGroupScreen = ({ onBack, onCreateGroup }) => {
 
     setLoading(true);
     try {
-      // Backend currently doesn't support image uploads in create route
-      // Images can be added later via updateGroup when backend supports it
       const result = await dispatch(createGroup({
         name: name.trim(),
         description: description.trim(),
         privacy,
-        tags: [], // Can be added later if needed
-        settings: {}, // Can be customized later
-        // coverImage and profileImage are stored locally but not sent yet
-        // TODO: Upload images after group creation when backend supports it
+        tags: [],
+        settings: {},
+        coverImage: coverImage,
+        profileImage: profileImage,
       })).unwrap();
       
-      // Show info about images if they were selected
-      if (coverImage || profileImage) {
-        Alert.alert(
-          'Group Created',
-          'Group created successfully! Note: Images will be added in a future update when the backend supports image uploads.',
-          [{ text: 'OK' }]
-        );
-      }
+      Alert.alert('Success', 'Group created successfully!');
       
       if (onCreateGroup) {
         onCreateGroup(result);
@@ -116,32 +107,36 @@ const CreateGroupScreen = ({ onBack, onCreateGroup }) => {
           <TouchableOpacity 
             style={styles.coverImageContainer}
             onPress={() => pickImage('cover')}
+            activeOpacity={0.9}
           >
             {coverImage ? (
               <Image source={{ uri: coverImage.uri }} style={styles.coverImage} />
             ) : (
               <View style={styles.coverImagePlaceholder}>
-                <Icon name="camera" size={32} color={colors.textLight} />
+                <Icon name="image" size={40} color={colors.textLight} />
                 <Text style={styles.placeholderText}>Add Cover Photo</Text>
               </View>
             )}
-            <View style={styles.coverImageOverlay}>
-              <Icon name="camera" size={20} color="#fff" />
+            <View style={styles.coverImageEditButton}>
+              <Icon name="camera" size={16} color="#fff" />
             </View>
           </TouchableOpacity>
 
           {/* Profile Image */}
           <View style={styles.profileImageSection}>
-            <TouchableOpacity onPress={() => pickImage('profile')}>
+            <TouchableOpacity 
+              onPress={() => pickImage('profile')}
+              activeOpacity={0.9}
+            >
               {profileImage ? (
                 <Image source={{ uri: profileImage.uri }} style={styles.profileImage} />
               ) : (
                 <View style={styles.profileImagePlaceholder}>
-                  <Icon name="camera" size={24} color={colors.textLight} />
+                  <Icon name="user" size={40} color={colors.textLight} />
                 </View>
               )}
               <View style={styles.profileImageEdit}>
-                <Icon name="camera" size={14} color="#fff" />
+                <Icon name="camera" size={12} color="#fff" />
               </View>
             </TouchableOpacity>
           </View>
@@ -248,10 +243,12 @@ const styles = StyleSheet.create({
     width: '100%',
     height: 200,
     position: 'relative',
+    backgroundColor: colors.surface,
   },
   coverImage: {
     width: '100%',
     height: '100%',
+    resizeMode: 'cover',
   },
   coverImagePlaceholder: {
     width: '100%',
@@ -264,19 +261,26 @@ const styles = StyleSheet.create({
     marginTop: spacing.s,
     color: colors.textLight,
     fontSize: 14,
+    fontWeight: '500',
   },
-  coverImageOverlay: {
+  coverImageEditButton: {
     position: 'absolute',
     bottom: spacing.m,
     right: spacing.m,
-    backgroundColor: 'rgba(0,0,0,0.6)',
-    borderRadius: 20,
-    padding: spacing.s,
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    borderRadius: 25,
+    width: 44,
+    height: 44,
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderWidth: 2,
+    borderColor: '#fff',
   },
   profileImageSection: {
     alignItems: 'center',
-    marginTop: -40,
-    marginBottom: spacing.m,
+    marginTop: -50,
+    marginBottom: spacing.l,
+    zIndex: 1,
   },
   profileImage: {
     width: 100,
@@ -284,6 +288,7 @@ const styles = StyleSheet.create({
     borderRadius: 50,
     borderWidth: 4,
     borderColor: colors.bg,
+    backgroundColor: colors.surface,
   },
   profileImagePlaceholder: {
     width: 100,
@@ -297,16 +302,21 @@ const styles = StyleSheet.create({
   },
   profileImageEdit: {
     position: 'absolute',
-    bottom: 0,
-    right: 0,
+    bottom: 2,
+    right: 2,
     backgroundColor: colors.pink,
-    borderRadius: 15,
-    width: 30,
-    height: 30,
+    borderRadius: 18,
+    width: 36,
+    height: 36,
     justifyContent: 'center',
     alignItems: 'center',
     borderWidth: 3,
     borderColor: colors.bg,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 4,
   },
   form: {
     padding: spacing.m,

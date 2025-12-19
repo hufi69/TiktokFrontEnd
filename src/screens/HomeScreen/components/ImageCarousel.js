@@ -81,7 +81,10 @@ const ImageCarousel = ({ images, style }) => {
         <TouchableOpacity
           style={styles.mediaContainer}
           activeOpacity={0.9}
-          onPress={() => setSelectedVideo(videoUrl)}
+          onPress={() => {
+            console.log('🎯 Play button pressed, setting video:', fullVideoUrl.substring(0, 80));
+            setSelectedVideo(fullVideoUrl);
+          }}
         >
           {thumbnailUri ? (
             <Image
@@ -112,10 +115,17 @@ const ImageCarousel = ({ images, style }) => {
               <Text style={styles.videoPlaceholderText}>Video</Text>
             </View>
           )}
-          <View style={styles.videoOverlay} pointerEvents="none">
-            <View style={styles.playButton}>
+          <View style={styles.videoOverlay} pointerEvents="box-none">
+            <TouchableOpacity 
+              style={styles.playButton}
+              onPress={() => {
+                console.log('🎯 Play button overlay pressed, setting video:', fullVideoUrl.substring(0, 80));
+                setSelectedVideo(fullVideoUrl);
+              }}
+              activeOpacity={0.8}
+            >
               <Icon name="play-circle" size={64} color="white" />
-            </View>
+            </TouchableOpacity>
           </View>
         </TouchableOpacity>
       );

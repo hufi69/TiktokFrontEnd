@@ -4,13 +4,11 @@ import Icon from 'react-native-vector-icons/FontAwesome';
 import { colors, spacing, radius } from '../../../constants/theme';
 import { CONFIG } from '../../../config';
 
-const DEFAULT_GROUP_IMAGE = 'https://images.unsplash.com/photo-1522071820081-009f0129c71c?w=400&h=200&fit=crop';
-
 const getGroupImageUrl = (image) => {
-  if (!image) return DEFAULT_GROUP_IMAGE;
+  if (!image) return null;
   if (/^https?:\/\//.test(image)) return image;
   const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
-  return `${baseUrl}/public/img/groups/${image}`;
+  return `${baseUrl}${image.startsWith('/') ? image : `/${image}`}`;
 };
 
 const GroupItem = ({ group, onPress, isJoined, onJoin, joining }) => {
@@ -28,18 +26,28 @@ const GroupItem = ({ group, onPress, isJoined, onJoin, joining }) => {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Image 
-        source={{ uri: getGroupImageUrl(group.coverImage || group.profileImage) }}
-        style={styles.coverImage}
-        resizeMode="cover"
-      />
+      {getGroupImageUrl(group.coverImage || group.profileImage) ? (
+        <Image 
+          source={{ uri: getGroupImageUrl(group.coverImage || group.profileImage) }}
+          style={styles.coverImage}
+          resizeMode="cover"
+        />
+      ) : (
+        <View style={styles.coverImagePlaceholder}>
+          <Icon name="image" size={32} color={colors.textLight} />
+        </View>
+      )}
       <View style={styles.content}>
         <View style={styles.header}>
-          {group.profileImage && (
+          {getGroupImageUrl(group.profileImage) ? (
             <Image 
               source={{ uri: getGroupImageUrl(group.profileImage) }}
               style={styles.profileImage}
             />
+          ) : (
+            <View style={styles.profileImagePlaceholder}>
+              <Icon name="users" size={24} color={colors.textLight} />
+            </View>
           )}
           <View style={styles.info}>
             <View style={styles.nameRow}>
@@ -106,6 +114,15 @@ const styles = StyleSheet.create({
     borderRadius: radius.m,
     marginRight: spacing.s,
     backgroundColor: colors.surface,
+  },
+  profileImagePlaceholder: {
+    width: 50,
+    height: 50,
+    borderRadius: radius.m,
+    marginRight: spacing.s,
+    backgroundColor: colors.surface,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
   info: {
     flex: 1,

@@ -10,22 +10,26 @@ import {
   Platform,
   RefreshControl,
   ActivityIndicator,
+  Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { FlashList } from '@shopify/flash-list';
 import Icon from 'react-native-vector-icons/FontAwesome';
 import { colors, spacing, radius } from '../../constants/theme';
 import { useAppDispatch, useAppSelector } from '../../hooks/hooks';
-import { fetchGroupComments, createGroupComment, updateGroupComment, deleteGroupComment } from '../../store/slices/groupsSlice';
-import { CONFIG } from '../../config';
+import { fetchGroupComments, createGroupComment, deleteGroupComment } from '../../store/slices/groupsSlice';
+import { API_CONFIG } from '../../config/api';
 
 const DEFAULT_AVATAR = 'https://images.unsplash.com/photo-1494790108755-2616b612b786?w=150&h=150&fit=crop&crop=face';
 
 const getAvatarUrl = (profilePicture) => {
   if (!profilePicture) return DEFAULT_AVATAR;
-  if (/^https?:\/\//.test(profilePicture)) return profilePicture;
-  const baseUrl = CONFIG.API_BASE_URL.replace(/\/$/, '');
-  return `${baseUrl}/public/uploads/users/${profilePicture}`;
+  // If it's already a full URL (starts with http), use it directly
+  if (/^https?:\/\//.test(profilePicture)) {
+    return profilePicture;
+  }
+  // Otherwise, construct the full URL with base URL
+  return `${API_CONFIG.BASE_URL}/public/uploads/users/${profilePicture}`;
 };
 
 const GroupCommentScreen = ({ 
@@ -44,7 +48,6 @@ const GroupCommentScreen = ({
   const [refreshing, setRefreshing] = useState(false);
   const [input, setInput] = useState('');
   const [replyingTo, setReplyingTo] = useState(null);
-  const [editingComment, setEditingComment] = useState(null);
   const [submitting, setSubmitting] = useState(false);
   const inputRef = useRef(null);
 
@@ -67,26 +70,16 @@ const GroupCommentScreen = ({
 
     setSubmitting(true);
     try {
-      if (editingComment) {
-        // Update comment
-        await dispatch(updateGroupComment({
-          groupId,
-          commentId: editingComment._id || editingComment.id,
-          commentData: { content: input.trim() }
-        })).unwrap();
-        setEditingComment(null);
-      } else {
-        // Create comment
-        await dispatch(createGroupComment({
-          groupId,
-          postId,
-          commentData: {
-            content: input.trim(),
-            parentComment: replyingTo?._id || replyingTo?.id || null,
-          }
-        })).unwrap();
-        setReplyingTo(null);
-      }
+      // Create comment
+      await dispatch(createGroupComment({
+        groupId,
+        postId,
+        commentData: {
+          content: input.trim(),
+          parentComment: replyingTo?._id || replyingTo?.id || null,
+        }
+      })).unwrap();
+      setReplyingTo(null);
       setInput('');
       inputRef.current?.blur();
     } catch (error) {
@@ -94,10 +87,11 @@ const GroupCommentScreen = ({
     } finally {
       setSubmitting(false);
     }
-  }, [input, editingComment, replyingTo, groupId, postId, dispatch]);
+  }, [input, replyingTo, groupId, postId, dispatch]);
 
   const handleDelete = useCallback((comment) => {
-    const isAuthor = (comment.author?._id || comment.author?.id) === currentUserId;
+    const commentUser = comment.user || comment.author;
+    const isAuthor = (commentUser?._id || commentUser?.id) === currentUserId;
     const canModerate = userRole === 'admin' || userRole === 'moderator';
     
     if (!isAuthor && !canModerate) return;
@@ -114,6 +108,7 @@ const GroupCommentScreen = ({
             try {
               await dispatch(deleteGroupComment({
                 groupId,
+                postId,
                 commentId: comment._id || comment.id
               })).unwrap();
             } catch (error) {
@@ -123,41 +118,35 @@ const GroupCommentScreen = ({
         },
       ]
     );
-  }, [groupId, currentUserId, userRole, dispatch]);
-
-  const handleEdit = useCallback((comment) => {
-    setEditingComment(comment);
-    setInput(comment.content || '');
-    setReplyingTo(null);
-    inputRef.current?.focus();
-  }, []);
+  }, [groupId, postId, currentUserId, userRole, dispatch]);
 
   const handleReply = useCallback((comment) => {
     setReplyingTo(comment);
-    setEditingComment(null);
     setInput('');
     inputRef.current?.focus();
   }, []);
 
   const renderComment = useCallback(({ item }) => {
-    const isAuthor = (item.author?._id || item.author?.id) === currentUserId;
+    // Support both 'user' and 'author' field names from backend
+    const commentUser = item.user || item.author;
+    const isAuthor = (commentUser?._id || commentUser?.id) === currentUserId;
     const canModerate = userRole === 'admin' || userRole === 'moderator';
     const isReply = !!item.parentComment;
 
     return (
       <View style={[styles.commentItem, isReply && styles.replyItem]}>
         <TouchableOpacity
-          onPress={() => onUserPress?.(item.author)}
+          onPress={() => onUserPress?.(commentUser)}
           style={styles.commentHeader}
         >
           <Image
-            source={{ uri: getAvatarUrl(item.author?.profilePicture) }}
+            source={{ uri: getAvatarUrl(commentUser?.profilePicture) }}
             style={styles.commentAvatar}
           />
           <View style={styles.commentContent}>
             <View style={styles.commentHeaderRow}>
               <Text style={styles.commentAuthor}>
-                {item.author?.userName || item.author?.fullName || 'Unknown'}
+                {commentUser?.fullName || commentUser?.userName || 'Unknown'}
               </Text>
               <Text style={styles.commentTime}>
                 {new Date(item.createdAt).toLocaleDateString()}
@@ -172,15 +161,6 @@ const GroupCommentScreen = ({
                 <Icon name="reply" size={14} color={colors.textLight} />
                 <Text style={styles.commentActionText}>Reply</Text>
               </TouchableOpacity>
-              {isAuthor && (
-                <TouchableOpacity
-                  style={styles.commentAction}
-                  onPress={() => handleEdit(item)}
-                >
-                  <Icon name="edit" size={14} color={colors.textLight} />
-                  <Text style={styles.commentActionText}>Edit</Text>
-                </TouchableOpacity>
-              )}
               {(isAuthor || canModerate) && (
                 <TouchableOpacity
                   style={styles.commentAction}
@@ -195,85 +175,88 @@ const GroupCommentScreen = ({
         </TouchableOpacity>
       </View>
     );
-  }, [currentUserId, userRole, handleReply, handleEdit, handleDelete, onUserPress]);
+  }, [currentUserId, userRole, handleReply, handleDelete, onUserPress]);
 
   return (
-    <SafeAreaView style={styles.container} edges={Platform.OS === 'ios' ? ['top', 'bottom'] : ['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={onBack} style={styles.backButton}>
-          <Icon name="chevron-left" size={22} color={colors.text} />
-        </TouchableOpacity>
-        <Text style={styles.title}>Comments</Text>
-        <View style={{ width: 30 }} />
-      </View>
-
-      {/* Post Preview */}
-      {post && (
-        <View style={styles.postPreview}>
-          <Text style={styles.postPreviewText} numberOfLines={2}>
-            {post.content || 'Group post'}
-          </Text>
-        </View>
-      )}
-
-      {/* Comments List */}
-      {isLoading && comments.length === 0 ? (
-        <View style={styles.loadingContainer}>
-          <ActivityIndicator size="large" color={colors.pink} />
-        </View>
-      ) : (
-        <FlashList
-          data={comments}
-          keyExtractor={(item) => item._id || item.id}
-          renderItem={renderComment}
-          estimatedItemSize={100}
-          contentContainerStyle={styles.listContent}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.pink]}
-            />
-          }
-          ListEmptyComponent={() => (
-            <View style={styles.emptyContainer}>
-              <Icon name="comment-o" size={48} color={colors.textLight} />
-              <Text style={styles.emptyText}>No comments yet</Text>
-              <Text style={styles.emptySubtext}>Be the first to comment</Text>
-            </View>
-          )}
-        />
-      )}
-
-      {/* Reply/Edit Indicator */}
-      {(replyingTo || editingComment) && (
-        <View style={styles.indicator}>
-          <Text style={styles.indicatorText}>
-            {editingComment ? 'Editing comment' : `Replying to ${replyingTo?.author?.userName || 'user'}`}
-          </Text>
-          <TouchableOpacity
-            onPress={() => {
-              setReplyingTo(null);
-              setEditingComment(null);
-              setInput('');
-            }}
-          >
-            <Icon name="times" size={16} color={colors.textLight} />
-          </TouchableOpacity>
-        </View>
-      )}
-
-      {/* Input */}
+    <SafeAreaView style={styles.container} edges={Platform.OS === 'ios' ? ['top'] : ['top']}>
       <KeyboardAvoidingView
+        style={{ flex: 1 }}
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
+        keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
       >
+        {/* Header */}
+        <View style={styles.header}>
+          <TouchableOpacity onPress={onBack} style={styles.backButton}>
+            <Icon name="chevron-left" size={22} color={colors.text} />
+          </TouchableOpacity>
+          <Text style={styles.title}>Comments</Text>
+          <View style={{ width: 30 }} />
+        </View>
+
+        {/* Post Preview */}
+        {post && (
+          <View style={styles.postPreview}>
+            <Text style={styles.postPreviewText} numberOfLines={2}>
+              {post.content || 'Group post'}
+            </Text>
+          </View>
+        )}
+
+        {/* Comments List */}
+        <View style={{ flex: 1 }}>
+          {isLoading && comments.length === 0 ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="large" color={colors.pink} />
+            </View>
+          ) : (
+            <FlashList
+              data={comments}
+              keyExtractor={(item) => item._id || item.id}
+              renderItem={renderComment}
+              estimatedItemSize={100}
+              contentContainerStyle={styles.listContent}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[colors.pink]}
+                />
+              }
+              ListEmptyComponent={() => (
+                <View style={styles.emptyContainer}>
+                  <Icon name="comment-o" size={48} color={colors.textLight} />
+                  <Text style={styles.emptyText}>No comments yet</Text>
+                  <Text style={styles.emptySubtext}>Be the first to comment</Text>
+                </View>
+              )}
+              keyboardShouldPersistTaps="handled"
+            />
+          )}
+        </View>
+
+        {/* Reply Indicator */}
+        {replyingTo && (
+          <View style={styles.indicator}>
+            <Text style={styles.indicatorText}>
+              {`Replying to ${(replyingTo?.user || replyingTo?.author)?.fullName || (replyingTo?.user || replyingTo?.author)?.userName || 'user'}`}
+            </Text>
+            <TouchableOpacity
+              onPress={() => {
+                setReplyingTo(null);
+                setInput('');
+              }}
+            >
+              <Icon name="times" size={16} color={colors.textLight} />
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* Input */}
         <View style={styles.inputContainer}>
           <TextInput
             ref={inputRef}
             style={styles.input}
-            placeholder={editingComment ? "Edit comment..." : replyingTo ? "Write a reply..." : "Write a comment..."}
+            placeholder={replyingTo ? "Write a reply..." : "Write a comment..."}
             placeholderTextColor={colors.textLight}
             value={input}
             onChangeText={setInput}

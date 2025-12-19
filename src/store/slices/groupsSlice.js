@@ -9,26 +9,19 @@ export const fetchGroups = createAsyncThunk(
       const response = await groupsApi.getGroups(params);
       return response.data || [];
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch groups');
+      return rejectWithValue(error.message );
     }
   }
 );
 
 export const fetchUserGroups = createAsyncThunk(
   'groups/fetchUserGroups',
-  async (_, { rejectWithValue, getState }) => {
+  async (params = {}, { rejectWithValue }) => {
     try {
-      const response = await groupsApi.getUserGroups();
-    
-      const allGroups = response.data || [];
-      
-      const currentUserId = getState().auth.user?._id || getState().auth.user?.id;
-      if (!currentUserId) {
-        return [];
-      }
-      return allGroups;
+      const response = await groupsApi.getUserGroups(params);
+      return response.data || [];
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch user groups');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -41,7 +34,7 @@ export const fetchGroup = createAsyncThunk(
       const response = await groupsApi.getGroup(groupId);
       return response.data || response;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch group');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -54,7 +47,7 @@ export const createGroup = createAsyncThunk(
       const response = await groupsApi.createGroup(groupData);
       return response.data || response;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to create group');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -67,7 +60,7 @@ export const updateGroup = createAsyncThunk(
       const response = await groupsApi.updateGroup(groupId, groupData);
       return response.data || response;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to update group');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -90,7 +83,7 @@ export const joinGroup = createAsyncThunk(
       if (errorMessage.toLowerCase().includes('already a member')) {
         return groupId;
       }
-      return rejectWithValue(error.message || 'Failed to join group');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -103,7 +96,7 @@ export const deleteGroup = createAsyncThunk(
       await groupsApi.deleteGroup(groupId);
       return groupId;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to delete group');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -116,7 +109,7 @@ export const fetchGroupPosts = createAsyncThunk(
       const response = await groupsApi.getGroupPosts(groupId, params);
       return { groupId, posts: response.data || [] };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch group posts');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -129,7 +122,7 @@ export const fetchGroupPost = createAsyncThunk(
       const response = await groupsApi.getGroupPost(groupId, postId);
       return { groupId, postId, post: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch group post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -142,7 +135,7 @@ export const createGroupPost = createAsyncThunk(
       const response = await groupsApi.createGroupPost(groupId, postData);
       return { groupId, post: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to create post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -155,7 +148,7 @@ export const likeGroupPost = createAsyncThunk(
       await groupsApi.likeGroupPost(groupId, postId);
       return { groupId, postId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to like post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -168,7 +161,7 @@ export const unlikeGroupPost = createAsyncThunk(
       await groupsApi.unlikeGroupPost(groupId, postId);
       return { groupId, postId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to unlike post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -181,7 +174,7 @@ export const fetchGroupMembers = createAsyncThunk(
       const response = await groupsApi.getGroupMembers(groupId, params);
       return { groupId, members: response.data || [] };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to fetch members');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -198,7 +191,7 @@ export const leaveGroup = createAsyncThunk(
       await groupsApi.updateMemberRole(groupId, currentUserId, { status: 'left' });
       return groupId;
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to leave group');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -211,7 +204,7 @@ export const updateMemberRole = createAsyncThunk(
       const response = await groupsApi.updateMemberRole(groupId, userId, updates);
       return { groupId, userId, member: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to update member');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -224,7 +217,7 @@ export const removeMember = createAsyncThunk(
       await groupsApi.removeMember(groupId, userId);
       return { groupId, userId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to remove member');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -237,7 +230,7 @@ export const updateGroupPost = createAsyncThunk(
       const response = await groupsApi.updateGroupPost(groupId, postId, postData);
       return { groupId, post: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to update post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -250,7 +243,7 @@ export const deleteGroupPost = createAsyncThunk(
       await groupsApi.deleteGroupPost(groupId, postId);
       return { groupId, postId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to delete post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -263,7 +256,7 @@ export const pinGroupPost = createAsyncThunk(
       const response = await groupsApi.pinGroupPost(groupId, postId, isPinned);
       return { groupId, post: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to pin post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -276,7 +269,7 @@ export const approveGroupPost = createAsyncThunk(
       const response = await groupsApi.approveGroupPost(groupId, postId);
       return { groupId, post: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to approve post');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -315,7 +308,7 @@ export const approveJoinRequest = createAsyncThunk(
       await groupsApi.approveJoinRequest(groupId, requestId);
       return { groupId, requestId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to approve request');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -328,7 +321,7 @@ export const rejectJoinRequest = createAsyncThunk(
       await groupsApi.rejectJoinRequest(groupId, requestId);
       return { groupId, requestId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to reject request');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -367,7 +360,7 @@ export const updateGroupComment = createAsyncThunk(
       const response = await groupsApi.updateGroupComment(groupId, commentId, commentData);
       return { groupId, comment: response.data || response };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to update comment');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -375,12 +368,12 @@ export const updateGroupComment = createAsyncThunk(
 // Delete group comment
 export const deleteGroupComment = createAsyncThunk(
   'groups/deleteGroupComment',
-  async ({ groupId, commentId }, { rejectWithValue }) => {
+  async ({ groupId, postId, commentId }, { rejectWithValue }) => {
     try {
-      await groupsApi.deleteGroupComment(groupId, commentId);
-      return { groupId, commentId };
+      await groupsApi.deleteGroupComment(groupId, postId, commentId);
+      return { groupId, postId, commentId };
     } catch (error) {
-      return rejectWithValue(error.message || 'Failed to delete comment');
+      return rejectWithValue(error.message );
     }
   }
 );
@@ -928,7 +921,7 @@ const groupsSlice = createSlice({
     // Search Groups
     builder
       .addCase(searchGroups.fulfilled, (state, action) => {
-        // Search results can be stored separately or merged with groups
+       
         state.groups = action.payload;
       });
   },

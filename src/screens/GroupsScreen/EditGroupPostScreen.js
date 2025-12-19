@@ -20,6 +20,16 @@ import { useAppDispatch } from '../../hooks/hooks';
 import { updateGroupPost } from '../../store/slices/groupsSlice';
 import { colors, spacing, radius } from '../../constants/theme';
 import { CONFIG } from '../../config';
+import VideoPlayerModal from '../../components/VideoPlayerModal';
+
+// Try to import react-native-video
+let Video = null;
+try {
+  const videoModule = require('react-native-video');
+  Video = videoModule.default || videoModule;
+} catch (e) {
+  // Video module not available
+}
 
 const getMediaUrl = (mediaItem) => {
   if (!mediaItem) return null;
@@ -50,6 +60,7 @@ const EditGroupPostScreen = ({ group, post, onBack, onPostUpdated, userRole }) =
   const [status, setStatus] = useState(post?.status || 'published');
   const [isPinned, setIsPinned] = useState(post?.isPinned || false);
   const [isLoading, setIsLoading] = useState(false);
+  const [selectedVideo, setSelectedVideo] = useState(null);
 
   useEffect(() => {
     if (post?.media && Array.isArray(post.media)) {
@@ -399,19 +410,67 @@ const EditGroupPostScreen = ({ group, post, onBack, onPostUpdated, userRole }) =
           {media.length > 0 && (
             <View style={styles.mediaContainer}>
               <Text style={styles.mediaSectionTitle}>Media (Cannot be edited)</Text>
-              {media.map((item, index) => (
-                <View key={index} style={styles.mediaItem}>
-                  {item.isVideo ? (
-                    <View style={styles.videoPlaceholder}>
-                      <Icon name="video-camera" size={40} color={colors.textLight} />
-                      <Text style={styles.videoText}>Video</Text>
+              <View style={styles.mediaGrid}>
+                {media.map((item, index) => {
+                  const isVideo = item.isVideo;
+                  const mediaUrl = item.uri || item.existingUrl;
+                  const fullVideoUrl = mediaUrl && mediaUrl.startsWith('http') ? mediaUrl : `${CONFIG.API_BASE_URL}${mediaUrl}`;
+                  const thumbnail = item.thumbnailUrl || item.thumbnail;
+                  const thumbnailUri = thumbnail
+                    ? (thumbnail.startsWith('http') ? thumbnail : `${CONFIG.API_BASE_URL}${thumbnail}`)
+                    : null;
+                  const canUseVideoThumbnail = Video && (typeof Video === 'function' || typeof Video === 'object');
+
+                  return (
+                    <View key={index} style={styles.mediaItem}>
+                      {isVideo ? (
+                        <TouchableOpacity
+                          style={styles.videoContainer}
+                          onPress={() => setSelectedVideo(fullVideoUrl)}
+                          activeOpacity={0.9}
+                        >
+                          {thumbnailUri ? (
+                            <Image
+                              source={{ uri: thumbnailUri }}
+                              style={styles.mediaImage}
+                              resizeMode="cover"
+                            />
+                          ) : canUseVideoThumbnail ? (
+                            <View style={styles.videoThumbnailContainer}>
+                              <Video
+                                source={{ uri: fullVideoUrl }}
+                                style={styles.videoThumbnail}
+                                resizeMode="cover"
+                                paused={true}
+                                muted={true}
+                              />
+                            </View>
+                          ) : (
+                            <View style={styles.videoPlaceholder}>
+                              <Icon name="video-camera" size={24} color={colors.textLight} />
+                            </View>
+                          )}
+                          <View style={styles.videoOverlay}>
+                            <Icon name="play-circle" size={20} color="white" />
+                          </View>
+                        </TouchableOpacity>
+                      ) : (
+                        <Image source={{ uri: mediaUrl }} style={styles.mediaImage} />
+                      )}
                     </View>
-                  ) : (
-                    <Image source={{ uri: item.uri || item.existingUrl }} style={styles.mediaImage} />
-                  )}
-                </View>
-              ))}
+                  );
+                })}
+              </View>
             </View>
+          )}
+
+          {/* Video Player Modal */}
+          {selectedVideo && (
+            <VideoPlayerModal
+              videoUri={selectedVideo}
+              visible={!!selectedVideo}
+              onClose={() => setSelectedVideo(null)}
+            />
           )}
         </ScrollView>
       </KeyboardAvoidingView>
@@ -563,6 +622,11 @@ const styles = StyleSheet.create({
     color: colors.textLight,
     marginBottom: spacing.s,
   },
+  mediaGrid: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    gap: spacing.s,
+  },
   mediaItem: {
     width: '48%',
     aspectRatio: 1,
@@ -573,6 +637,21 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: radius.m,
   },
+  videoContainer: {
+    width: '100%',
+    height: '100%',
+    position: 'relative',
+  },
+  videoThumbnailContainer: {
+    width: '100%',
+    height: '100%',
+    borderRadius: radius.m,
+    overflow: 'hidden',
+  },
+  videoThumbnail: {
+    width: '100%',
+    height: '100%',
+  },
   videoPlaceholder: {
     width: '100%',
     height: '100%',
@@ -581,10 +660,16 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  videoText: {
-    marginTop: spacing.xs,
-    fontSize: 12,
-    color: colors.textLight,
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
+    borderRadius: radius.m,
   },
   removeButton: {
     position: 'absolute',

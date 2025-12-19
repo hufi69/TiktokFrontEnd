@@ -97,12 +97,12 @@ const SignupScreen = ({ onBack, onSubmit, onSocial, onGoToSignIn, isLoading = fa
               {isLoading ? (
                 <ActivityIndicator size="small" color={colors.bg} />
               ) : (
-                <Text style={[
-                  styles.primaryText,
-                  !isFormValid && styles.primaryTextDisabled
-                ]}>
-                  Sign up
-                </Text>
+              <Text style={[
+                styles.primaryText,
+                !isFormValid && styles.primaryTextDisabled
+              ]}>
+                Sign up
+              </Text>
               )}
             </TouchableOpacity>
           </View>

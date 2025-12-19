@@ -22,9 +22,20 @@ export async function getGroups(params = {}) {
   }
 }
 
-export async function getUserGroups() {
+export async function getUserGroups(params = {}) {
   try {
-    const result = await getRequest(`${MODEL_NAME}`);
+    const queryParams = new URLSearchParams();
+    if (params.search) queryParams.append('search', params.search);
+    if (params.privacy) queryParams.append('privacy', params.privacy);
+    if (params.tags) queryParams.append('tags', params.tags);
+    if (params.page) queryParams.append('page', params.page);
+    if (params.limit) queryParams.append('limit', params.limit);
+
+    const queryString = queryParams.toString();
+    const url = queryString 
+      ? `${MODEL_NAME}/my-groups?${queryString}` 
+      : `${MODEL_NAME}/my-groups`;
+    const result = await getRequest(url);
     return result;
   } catch (err) {
     throw err;
@@ -45,22 +56,63 @@ export async function getGroup(groupId) {
 // Create group
 export async function createGroup(groupData) {
   try {
-
-    // TODO: Add image upload support when backend is updated with multer middleware
-    const payload = {
-      name: groupData.name,
-      description: groupData.description || '',
-      privacy: groupData.privacy || 'public',
-      tags: groupData.tags || [],
-      settings: groupData.settings || {},
-    };
-
-    // Note: coverImage and profileImage are not sent yet
-    // Backend route needs multer middleware to handle file uploads
-    // For now, images can be uploaded separately via updateGroup endpoint
-    
-    const result = await postRequest(`${MODEL_NAME}`, payload);
-    return result;
+    // Check if we have images to upload
+    if (groupData.coverImage || groupData.profileImage) {
+      const formData = new FormData();
+      
+      // Add text data as JSON string in 'data' field (if backend expects it)
+      // Or add directly to FormData (check backend implementation)
+      const textData = {
+        name: groupData.name,
+        description: groupData.description || '',
+        privacy: groupData.privacy || 'public',
+        tags: groupData.tags || [],
+        settings: groupData.settings || {},
+      };
+      
+      // Backend expects direct fields in FormData based on the route code
+      formData.append('name', textData.name);
+      formData.append('description', textData.description);
+      formData.append('privacy', textData.privacy);
+      if (textData.tags && textData.tags.length > 0) {
+        formData.append('tags', JSON.stringify(textData.tags));
+      }
+      if (textData.settings && Object.keys(textData.settings).length > 0) {
+        formData.append('settings', JSON.stringify(textData.settings));
+      }
+      
+      // Add images
+      if (groupData.coverImage && groupData.coverImage.uri) {
+        formData.append('coverImage', {
+          uri: groupData.coverImage.uri,
+          type: groupData.coverImage.type || 'image/jpeg',
+          name: groupData.coverImage.fileName || groupData.coverImage.name || `cover_${Date.now()}.jpg`,
+        });
+      }
+      
+      if (groupData.profileImage && groupData.profileImage.uri) {
+        formData.append('profileImage', {
+          uri: groupData.profileImage.uri,
+          type: groupData.profileImage.type || 'image/jpeg',
+          name: groupData.profileImage.fileName || groupData.profileImage.name || `profile_${Date.now()}.jpg`,
+        });
+      }
+      
+      const result = await postFormDataRequest(`${MODEL_NAME}`, formData);
+      return result;
+    } else {
+      // No images, send as JSON
+      const payload = {
+        name: groupData.name,
+        description: groupData.description || '',
+        privacy: groupData.privacy || 'public',
+        tags: groupData.tags || [],
+        settings: groupData.settings || {},
+      };
+      
+      const result = await postRequest(`${MODEL_NAME}`, payload);
+      return result;
+    }
   } catch (err) {
     throw err;
   }
@@ -157,16 +209,28 @@ export async function createGroupPost(groupId, postData) {
         mentions: postData.mentions || [],
       };
       formData.append('data', JSON.stringify(payload));
+      
+      // Separate images and videos
       postData.media.forEach((mediaItem, idx) => {
         if (mediaItem?.uri) {
           const type = mediaItem.type || 'image/jpeg';
-          const isVideo = typeof type === 'string' && type.startsWith('video/');
+          const isVideo = typeof type === 'string' && type.startsWith('video/') || mediaItem.isVideo;
           const fallbackName = isVideo ? `video_${idx}.mp4` : `image_${idx}.jpg`;
-          formData.append('images', {
-            uri: mediaItem.uri,
-            type,
-            name: mediaItem.fileName || mediaItem.name || mediaItem.filename || fallbackName,
-          });
+          const fileName = mediaItem.fileName || mediaItem.name || mediaItem.filename || fallbackName;
+          
+          if (isVideo) {
+            formData.append('videos', {
+              uri: mediaItem.uri,
+              type,
+              name: fileName,
+            });
+          } else {
+            formData.append('images', {
+              uri: mediaItem.uri,
+              type,
+              name: fileName,
+            });
+          }
         }
       });
 
@@ -406,12 +470,9 @@ export async function updateGroupComment(groupId, commentId, commentData) {
 }
 
 // Delete group comment
-// Note: Backend doesn't have this endpoint yet - placeholder for future implementation
-export async function deleteGroupComment(groupId, commentId) {
+export async function deleteGroupComment(groupId, postId, commentId) {
   try {
-    // TODO: Backend needs to add DELETE /:groupId/comments/:commentId
-    // For now, this will fail - handle gracefully in UI
-    const result = await deleteRequest(`${MODEL_NAME}/${groupId}/comments/${commentId}`);
+    const result = await deleteRequest(`${MODEL_NAME}/${groupId}/posts/${postId}/comments/${commentId}`);
     return result;
   } catch (err) {
     throw err;
@@ -497,14 +558,18 @@ export async function deactivateInviteLink(linkId) {
 // Search groups
 export async function searchGroups(query, params = {}) {
   try {
-    const queryParams = new URLSearchParams({ q: query });
+   
+    const isMyGroups = params.isMyGroups || false;
+    const baseUrl = isMyGroups ? `${MODEL_NAME}/my-groups` : MODEL_NAME;
+    
+    const queryParams = new URLSearchParams({ search: query });
     if (params.privacy) queryParams.append('privacy', params.privacy);
     if (params.tags) queryParams.append('tags', params.tags);
     if (params.page) queryParams.append('page', params.page);
     if (params.limit) queryParams.append('limit', params.limit);
 
     const queryString = queryParams.toString();
-    const url = `${MODEL_NAME}/search?${queryString}`;
+    const url = `${baseUrl}?${queryString}`;
     const result = await getRequest(url);
     return result;
   } catch (err) {

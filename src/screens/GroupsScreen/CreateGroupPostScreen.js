@@ -81,7 +81,7 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
           PermissionsAndroid.PERMISSIONS.CAMERA,
           {
             title: 'Camera Permission',
-            message: 'TokTok needs access to your camera to take photos.',
+            message: 'TokTok needs access to your camera to take photos and videos.',
             buttonNeutral: 'Ask Me Later',
             buttonNegative: 'Cancel',
             buttonPositive: 'OK',
@@ -127,10 +127,10 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
     }
   };
 
-  const captureFromCamera = async () => {
+  const captureFromCamera = async (captureType = 'photo') => {
     const hasPermission = await requestCameraPermission();
     if (!hasPermission) {
-      Alert.alert('Permission Denied', 'Camera permission is required to take photos.');
+      Alert.alert('Permission Denied', 'Camera permission is required to take photos and videos.');
       return;
     }
 
@@ -141,27 +141,52 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
         return;
       }
 
-      const options = {
-        mediaType: 'photo',
-        quality: 0.8,
-        maxWidth: 1024,
-        maxHeight: 1024,
-        saveToPhotos: true,
+      const baseOptions = {
+        saveToPhotos: false,
       };
+
+      const options = captureType === 'video'
+        ? {
+            ...baseOptions,
+            mediaType: 'video',
+            videoQuality: 'high',
+            durationLimit: 60,
+          }
+        : {
+            ...baseOptions,
+            mediaType: 'photo',
+            quality: 0.8,
+            maxWidth: 1024,
+            maxHeight: 1024,
+          };
 
       const result = await launchCamera(options);
       if (result?.didCancel) return;
       if (result?.errorCode) {
-        Alert.alert('Error', result.errorMessage || 'Failed to capture photo');
+        Alert.alert('Error', result.errorMessage || 'Failed to open camera');
         return;
       }
 
       if (result?.assets?.[0]) {
-        addPickedAssets([result.assets[0]]);
+        addPickedAssets(result.assets);
       }
     } catch (error) {
-      Alert.alert('Error', 'Failed to capture photo');
+      Alert.alert('Error', 'Failed to open camera');
     }
+  };
+
+  const handleCameraPress = () => {
+    const remainingSlots = 5 - media.length;
+    if (remainingSlots <= 0) {
+      Alert.alert('Limit Reached', 'You can only add up to 5 photos and videos per post.');
+      return;
+    }
+
+    Alert.alert('Camera', 'Choose what to capture', [
+      { text: 'Take Photo', onPress: () => captureFromCamera('photo') },
+      { text: 'Record Video', onPress: () => captureFromCamera('video') },
+      { text: 'Cancel', style: 'cancel' },
+    ]);
   };
 
   const removeMedia = (index) => {
@@ -252,9 +277,11 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
               {media.map((item, index) => (
                 <View key={index} style={styles.mediaItem}>
                   {item.isVideo ? (
-                    <View style={styles.videoPlaceholder}>
-                      <Icon name="video-camera" size={40} color={colors.textLight} />
-                      <Text style={styles.videoText}>Video</Text>
+                    <View style={styles.videoContainer}>
+                      <Image source={{ uri: item.uri }} style={styles.mediaImage} />
+                      <View style={styles.videoOverlay}>
+                        <Icon name="play-circle" size={32} color="white" />
+                      </View>
                     </View>
                   ) : (
                     <Image source={{ uri: item.uri }} style={styles.mediaImage} />
@@ -276,7 +303,7 @@ const CreateGroupPostScreen = ({ group, onBack, onPostCreated }) => {
               <Icon name="photo" size={20} color={colors.pink} />
               <Text style={styles.mediaButtonText}>Photos/Videos</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.mediaButton} onPress={captureFromCamera}>
+            <TouchableOpacity style={styles.mediaButton} onPress={handleCameraPress}>
               <Icon name="camera" size={20} color={colors.pink} />
               <Text style={styles.mediaButtonText}>Camera</Text>
             </TouchableOpacity>
@@ -362,18 +389,20 @@ const styles = StyleSheet.create({
     height: '100%',
     borderRadius: radius.m,
   },
-  videoPlaceholder: {
+  videoContainer: {
     width: '100%',
     height: '100%',
-    backgroundColor: colors.surface,
-    borderRadius: radius.m,
+    position: 'relative',
+  },
+  videoOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  videoText: {
-    marginTop: spacing.xs,
-    fontSize: 12,
-    color: colors.textLight,
+    backgroundColor: 'rgba(0, 0, 0, 0.3)',
   },
   removeButton: {
     position: 'absolute',
